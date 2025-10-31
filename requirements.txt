@@ -23,5 +23,8 @@ python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
 
+# Automation & Scheduling
+schedule  # Task scheduling
+
 # Optional: Production extras
 gunicorn  # Production WSGI server

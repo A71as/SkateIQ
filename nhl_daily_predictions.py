@@ -675,6 +675,12 @@ async def root():
     """Home page showing today's NHL games"""
     return get_html_template()
 
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_dashboard():
+    """Analytics dashboard with charts and performance metrics"""
+    from analytics_html import get_analytics_html_template
+    return get_analytics_html_template()
+
 @app.get("/api/games/{date}")
 async def get_games_by_date(date: str):
     """Get NHL games for a specific date (YYYY-MM-DD format)"""
@@ -973,6 +979,129 @@ async def get_current_user_info(current_user: User = Depends(require_current_use
         "is_premium": current_user.is_premium,
         "created_at": current_user.created_at.isoformat()
     }
+
+# ============================================================================
+# ANALYTICS ENDPOINTS
+# ============================================================================
+
+@app.get("/api/analytics/accuracy-trends")
+async def get_accuracy_trends_endpoint(
+    days: int = 30, 
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """Get accuracy trends over time"""
+    try:
+        from analytics import get_accuracy_trends
+        user_id = current_user.id if current_user else None
+        data = get_accuracy_trends(db, days=days, user_id=user_id)
+        return {"success": True, **data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/analytics/confidence-analysis")
+async def get_confidence_analysis_endpoint(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """Get accuracy by confidence level"""
+    try:
+        from analytics import get_confidence_analysis
+        user_id = current_user.id if current_user else None
+        data = get_confidence_analysis(db, user_id=user_id)
+        return {"success": True, **data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/analytics/team-performance")
+async def get_team_performance_endpoint(
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """Get team-specific prediction performance"""
+    try:
+        from analytics import get_team_performance
+        user_id = current_user.id if current_user else None
+        data = get_team_performance(db, user_id=user_id, limit=limit)
+        return {"success": True, **data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/analytics/streaks")
+async def get_prediction_streaks_endpoint(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """Get current and longest prediction streaks"""
+    try:
+        from analytics import get_prediction_streaks
+        user_id = current_user.id if current_user else None
+        data = get_prediction_streaks(db, user_id=user_id)
+        return {"success": True, **data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/analytics/home-away")
+async def get_home_away_analysis_endpoint(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """Get home vs away prediction analysis"""
+    try:
+        from analytics import get_home_away_analysis
+        user_id = current_user.id if current_user else None
+        data = get_home_away_analysis(db, user_id=user_id)
+        return {"success": True, **data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# ADMIN/UTILITY ENDPOINTS
+# ============================================================================
+
+@app.post("/api/admin/scrape-results")
+async def trigger_result_scrape(days_back: int = 1, current_user: User = Depends(require_current_user)):
+    """Manually trigger game result scraping (admin only)"""
+    # For now, allow any authenticated user - in production, add admin role check
+    try:
+        from game_result_scraper import NHLResultScraper
+        
+        scraper = NHLResultScraper()
+        stats = scraper.scrape_recent_games(days_back=days_back)
+        
+        return {
+            "success": True,
+            "message": f"Scraped last {days_back} days",
+            "stats": stats,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Scraping failed: {str(e)}"
+        )
+
+@app.get("/api/admin/unresolved-predictions")
+async def get_unresolved_predictions(days_back: int = 7, current_user: User = Depends(require_current_user)):
+    """Get predictions that haven't been updated with results yet"""
+    try:
+        from game_result_scraper import NHLResultScraper
+        
+        scraper = NHLResultScraper()
+        unresolved = scraper.get_unresolved_predictions(days_back=days_back)
+        
+        return {
+            "success": True,
+            "count": len(unresolved),
+            "predictions": unresolved,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get unresolved predictions: {str(e)}"
+        )
 
 @app.get("/health")
 async def health_check():
