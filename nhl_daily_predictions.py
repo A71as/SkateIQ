@@ -1,8 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, EmailStr
 from typing import Optional, Dict, Any
+from sqlalchemy.orm import Session
 import uvicorn
 import os
 from datetime import datetime, timedelta
@@ -13,6 +15,17 @@ import hashlib
 import json
 from pathlib import Path
 
+# Database and auth imports
+from database import get_db, Prediction, AccuracyStats, User, update_accuracy_stats
+from auth import (
+    get_current_user, 
+    require_current_user, 
+    authenticate_user, 
+    create_access_token, 
+    create_user,
+    ACCESS_TOKEN_EXPIRE_MINUTES
+)
+
 # Load environment variables
 load_dotenv()
 
@@ -21,93 +34,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 NHL_API_BASE = "https://api-web.nhle.com/v1"
 SPORTSDB_API_KEY = "123"  # Updated API key
 SPORTSDB_API_BASE = "https://www.thesportsdb.com/api/v1/json"
-PREDICTIONS_FILE = Path("data/predictions.json")
 
 # Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-
-# Prediction Storage
-class PredictionStorage:
-    def __init__(self, file_path: Path):
-        self.file_path = file_path
-        self.file_path.parent.mkdir(exist_ok=True)
-        self.predictions = self._load()
-    
-    def _load(self) -> Dict:
-        """Load predictions from file"""
-        if self.file_path.exists():
-            try:
-                with open(self.file_path, 'r') as f:
-                    return json.load(f)
-            except:
-                return {"predictions": [], "accuracy": {"total": 0, "correct": 0}}
-        return {"predictions": [], "accuracy": {"total": 0, "correct": 0}}
-    
-    def _save(self):
-        """Save predictions to file"""
-        with open(self.file_path, 'w') as f:
-            json.dump(self.predictions, f, indent=2)
-    
-    def add_prediction(self, home_team: str, away_team: str, game_date: str, 
-                       home_prob: int, away_prob: int, confidence: int):
-        """Store a prediction"""
-        prediction = {
-            "id": hashlib.md5(f"{home_team}_{away_team}_{game_date}".encode()).hexdigest(),
-            "home_team": home_team,
-            "away_team": away_team,
-            "game_date": game_date,
-            "home_prob": home_prob,
-            "away_prob": away_prob,
-            "confidence": confidence,
-            "predicted_winner": "home" if home_prob > away_prob else "away",
-            "created_at": datetime.now().isoformat(),
-            "actual_winner": None,
-            "is_correct": None
-        }
-        
-        # Remove existing prediction for same game
-        self.predictions["predictions"] = [
-            p for p in self.predictions["predictions"] 
-            if p["id"] != prediction["id"]
-        ]
-        
-        self.predictions["predictions"].append(prediction)
-        self._save()
-        return prediction
-    
-    def update_result(self, home_team: str, away_team: str, game_date: str, winner: str):
-        """Update prediction with actual result"""
-        pred_id = hashlib.md5(f"{home_team}_{away_team}_{game_date}".encode()).hexdigest()
-        for pred in self.predictions["predictions"]:
-            if pred["id"] == pred_id:
-                pred["actual_winner"] = winner
-                pred["is_correct"] = (pred["predicted_winner"] == winner)
-                
-                # Update accuracy stats
-                if pred["is_correct"] is not None:
-                    self.predictions["accuracy"]["total"] += 1
-                    if pred["is_correct"]:
-                        self.predictions["accuracy"]["correct"] += 1
-                
-                self._save()
-                return pred
-        return None
-    
-    def get_accuracy(self) -> Dict:
-        """Get accuracy statistics"""
-        total = self.predictions["accuracy"]["total"]
-        correct = self.predictions["accuracy"]["correct"]
-        
-        return {
-            "total_predictions": total,
-            "correct_predictions": correct,
-            "accuracy_percentage": round((correct / total * 100) if total > 0 else 0, 1),
-            "recent_predictions": len([p for p in self.predictions["predictions"] 
-                                      if datetime.fromisoformat(p["created_at"]) > datetime.now() - timedelta(days=7)])
-        }
-
-# Initialize storage
-prediction_storage = PredictionStorage(PREDICTIONS_FILE)
 
 # Simple in-memory cache with TTL
 class PredictionCache:
@@ -173,6 +102,18 @@ class MatchupRequest(BaseModel):
     home_team: str
     away_team: str
     game_date: Optional[str] = None
+
+class UserRegister(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
 
 class NHLDataFetcher:
     """Fetch NHL data from free NHL Stats API and TheSportsDB"""
@@ -835,17 +776,54 @@ async def analyze_matchup(request: dict):
             prediction_cache.set(home_team, away_team, game_date, result)
             print(f"💾 Cached prediction for {home_team} vs {away_team}")
             
-            # Store prediction for accuracy tracking
+            # Store prediction in database for accuracy tracking
             if result.get("home_prob") and result.get("away_prob") and result.get("confidence"):
-                prediction_storage.add_prediction(
-                    home_team=result.get("home_team", home_team),
-                    away_team=result.get("away_team", away_team),
-                    game_date=game_date,
-                    home_prob=result["home_prob"],
-                    away_prob=result["away_prob"],
-                    confidence=result["confidence"]
-                )
-                print(f"📊 Stored prediction for accuracy tracking")
+                # Get database session (use dependency injection pattern)
+                from database import SessionLocal
+                db = SessionLocal()
+                try:
+                    # Parse game date
+                    if 'T' in game_date:
+                        game_date_obj = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
+                    else:
+                        game_date_obj = datetime.strptime(game_date, '%Y-%m-%d')
+                    
+                    # Check if prediction already exists
+                    existing = db.query(Prediction).filter(
+                        Prediction.home_team == result.get("home_team", home_team),
+                        Prediction.away_team == result.get("away_team", away_team),
+                        Prediction.game_date == game_date_obj
+                    ).first()
+                    
+                    if existing:
+                        # Update existing prediction
+                        existing.home_prob = float(result["home_prob"])
+                        existing.away_prob = float(result["away_prob"])
+                        existing.confidence = str(result["confidence"])
+                        existing.predicted_winner = "home" if result["home_prob"] > result["away_prob"] else "away"
+                        existing.analysis_text = result.get("analysis", "")
+                    else:
+                        # Create new prediction
+                        prediction = Prediction(
+                            home_team=result.get("home_team", home_team),
+                            away_team=result.get("away_team", away_team),
+                            game_date=game_date_obj,
+                            home_prob=float(result["home_prob"]),
+                            away_prob=float(result["away_prob"]),
+                            confidence=str(result["confidence"]),
+                            predicted_winner="home" if result["home_prob"] > result["away_prob"] else "away",
+                            analysis_text=result.get("analysis", ""),
+                            user_id=None  # Anonymous prediction
+                        )
+                        db.add(prediction)
+                    
+                    db.commit()
+                    print(f"📊 Stored prediction in database")
+                except Exception as db_error:
+                    db.rollback()
+                    print(f"⚠️ Database error: {db_error}")
+                finally:
+                    db.close()
         
         print(f"✅ Analysis complete!")
         return result
@@ -859,13 +837,24 @@ async def analyze_matchup(request: dict):
         )
 
 @app.get("/api/accuracy")
-async def get_accuracy_stats():
-    """Get prediction accuracy statistics"""
+async def get_accuracy_stats(db: Session = Depends(get_db)):
+    """Get prediction accuracy statistics from database"""
     try:
-        stats = prediction_storage.get_accuracy()
+        # Get or create overall stats record
+        from database import get_or_create_overall_stats
+        stats = get_or_create_overall_stats(db)
+        
+        # Recalculate stats to ensure they're current
+        update_accuracy_stats(db)
+        db.refresh(stats)
+        
         return {
             "success": True,
-            **stats,
+            "total_predictions": stats.total_predictions,
+            "correct_predictions": stats.correct_predictions,
+            "accuracy_percentage": round(stats.accuracy_percentage, 1),
+            "last_7_days_accuracy": round(stats.last_7_days_accuracy or 0, 1),
+            "last_30_days_accuracy": round(stats.last_30_days_accuracy or 0, 1),
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
@@ -875,7 +864,7 @@ async def get_accuracy_stats():
         )
 
 @app.post("/api/update-result")
-async def update_game_result(request: dict):
+async def update_game_result(request: dict, db: Session = Depends(get_db)):
     """Update prediction with actual game result"""
     try:
         home_team = request.get("home_team")
@@ -889,12 +878,42 @@ async def update_game_result(request: dict):
         if winner not in ["home", "away"]:
             raise HTTPException(status_code=400, detail="Winner must be 'home' or 'away'")
         
-        result = prediction_storage.update_result(home_team, away_team, game_date, winner)
-        
-        if result:
-            return {"success": True, "prediction": result}
+        # Parse game date
+        if 'T' in game_date:
+            game_date_obj = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
         else:
+            game_date_obj = datetime.strptime(game_date, '%Y-%m-%d')
+        
+        # Find prediction
+        prediction = db.query(Prediction).filter(
+            Prediction.home_team == home_team,
+            Prediction.away_team == away_team,
+            Prediction.game_date == game_date_obj
+        ).first()
+        
+        if not prediction:
             raise HTTPException(status_code=404, detail="Prediction not found")
+        
+        # Update result
+        prediction.actual_winner = winner
+        prediction.is_correct = (prediction.predicted_winner == winner)
+        
+        db.commit()
+        
+        # Update accuracy stats
+        update_accuracy_stats(db)
+        
+        return {
+            "success": True,
+            "prediction": {
+                "home_team": prediction.home_team,
+                "away_team": prediction.away_team,
+                "game_date": prediction.game_date.isoformat(),
+                "predicted_winner": prediction.predicted_winner,
+                "actual_winner": prediction.actual_winner,
+                "is_correct": prediction.is_correct
+            }
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -902,6 +921,58 @@ async def update_game_result(request: dict):
             status_code=500,
             detail=f"Failed to update result: {str(e)}"
         )
+
+# ============================================================================
+# AUTHENTICATION ENDPOINTS
+# ============================================================================
+
+@app.post("/api/auth/register", response_model=Token)
+async def register(user_data: UserRegister, db: Session = Depends(get_db)):
+    """Register a new user account"""
+    try:
+        user = create_user(db, user_data.username, user_data.email, user_data.password)
+        
+        # Create access token
+        access_token = create_access_token(data={"sub": user.username})
+        
+        return {"access_token": access_token, "token_type": "bearer"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Registration failed: {str(e)}"
+        )
+
+@app.post("/api/auth/login", response_model=Token)
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """Login and receive JWT token"""
+    user = authenticate_user(db, form_data.username, form_data.password)
+    
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create access token
+    access_token = create_access_token(
+        data={"sub": user.username},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/api/auth/me")
+async def get_current_user_info(current_user: User = Depends(require_current_user)):
+    """Get current user information"""
+    return {
+        "username": current_user.username,
+        "email": current_user.email,
+        "is_premium": current_user.is_premium,
+        "created_at": current_user.created_at.isoformat()
+    }
 
 @app.get("/health")
 async def health_check():

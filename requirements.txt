@@ -1,6 +1,27 @@
+# Core Framework
 fastapi
 uvicorn[standard]
 pydantic
+pydantic[email]
+
+# HTTP & API
 requests
+
+# Environment & Configuration
 python-dotenv
+
+# AI/ML
 openai
+
+# Database (PostgreSQL)
+sqlalchemy>=2.0.0
+psycopg2-binary
+alembic
+
+# Authentication & Security
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+
+# Optional: Production extras
+gunicorn  # Production WSGI server
