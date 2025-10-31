@@ -1,272 +1,459 @@
 def get_html_template():
-    """Returns the HTML template for the daily predictions page"""
-    return """
-<!DOCTYPE html>
-<html>
+    """Returns the HTML template for the daily predictions page - Ultra modern Apple-inspired design"""
+    return """<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>NHL Daily Predictions - AI Powered</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkateIQ — Daily NHL Predictions</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-            padding: 20px;
-            color: #fff;
+        :root {
+            --bg-primary: #f5f5f7;
+            --bg-card: rgba(255, 255, 255, 0.85);
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --accent: #0071e3;
+            --accent-hover: #0077ed;
+            --border: rgba(0, 0, 0, 0.06);
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+            --radius: 18px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
         }
+
+        /* Header */
         header {
             text-align: center;
-            margin-bottom: 40px;
-            padding: 30px;
-            background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 48px;
+            padding: 48px 32px;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
         }
+
+        .logo {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #0071e3 0%, #005bb5 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            box-shadow: 0 4px 12px rgba(0, 113, 227, 0.2);
+        }
+
         h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 12px;
+            background: linear-gradient(90deg, var(--text-primary) 0%, var(--text-secondary) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
+
         .subtitle {
-            color: #a0aec0;
-            font-size: 1.1em;
+            font-size: 19px;
+            color: var(--text-secondary);
+            font-weight: 400;
         }
-        .date-header {
-            text-align: center;
-            font-size: 1.3em;
-            margin: 20px 0;
-            color: #667eea;
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            gap: 16px;
+            flex-wrap: wrap;
         }
+
+        .date-badge {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            padding: 12px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 12px;
+            border: none;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 113, 227, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 113, 227, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-secondary:hover {
+            background: white;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* Loading */
         .loading {
             text-align: center;
-            padding: 60px 20px;
-            font-size: 1.2em;
-            color: #a0aec0;
+            padding: 80px 20px;
         }
+
         .spinner {
-            border: 4px solid rgba(255,255,255,0.1);
-            border-top: 4px solid #667eea;
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 20px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
+            animation: spin 0.8s linear infinite;
         }
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to { transform: rotate(360deg); }
         }
+
+        .loading-text {
+            font-size: 17px;
+            color: var(--text-secondary);
+        }
+
+        /* Games Grid */
         .games-grid {
             display: grid;
-            gap: 20px;
-            margin-top: 30px;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 24px;
         }
+
         .game-card {
-            background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 25px;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.3s ease;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
         }
+
         .game-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
-            border-color: rgba(102, 126, 234, 0.5);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
         }
-        .matchup-header {
-            display: grid;
-            grid-template-columns: 2fr auto 2fr;
+
+        .matchup {
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 20px;
             margin-bottom: 20px;
             padding-bottom: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid var(--border);
         }
+
         .team {
-            text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
         }
+
+        .team-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, rgba(0, 113, 227, 0.1), rgba(0, 113, 227, 0.05));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .team-info {
+            flex: 1;
+        }
+
         .team-name {
-            font-size: 1.4em;
-            font-weight: bold;
-            margin-bottom: 5px;
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
         }
-        .team-location {
-            font-size: 0.85em;
-            color: #a0aec0;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 5px;
+
+        .team-badge {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
         }
+
         .vs {
-            font-size: 1.2em;
-            color: #667eea;
-            font-weight: bold;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 0 12px;
         }
+
         .game-time {
             text-align: center;
-            color: #a0aec0;
-            font-size: 0.95em;
-            margin-bottom: 15px;
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
         }
-        .prediction {
-            background: rgba(102, 126, 234, 0.1);
-            border-radius: 12px;
-            padding: 20px;
-            margin-top: 15px;
+
+        /* Predictions */
+        .prediction-section {
+            margin-top: 20px;
         }
-        .win-probabilities {
+
+        .probabilities {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 15px;
+            gap: 12px;
+            margin-bottom: 16px;
         }
+
         .probability {
-            text-align: center;
-            padding: 15px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-        }
-        .probability-label {
-            font-size: 0.9em;
-            color: #a0aec0;
-            margin-bottom: 5px;
-        }
-        .probability-value {
-            font-size: 2em;
-            font-weight: bold;
-            color: #667eea;
-        }
-        .winner {
-            background: rgba(102, 234, 134, 0.1);
-        }
-        .winner .probability-value {
-            color: #66ea86;
-        }
-        .confidence {
-            text-align: center;
-            margin-top: 10px;
-            padding: 10px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            font-size: 0.95em;
-        }
-        .analyze-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 1em;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
-            transition: all 0.3s ease;
-        }
-        .analyze-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-        }
-        .analyze-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        .error {
-            background: rgba(239, 68, 68, 0.1);
-            border: 2px solid rgba(239, 68, 68, 0.3);
+            background: rgba(0, 113, 227, 0.04);
+            padding: 16px;
             border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(0, 113, 227, 0.08);
+            transition: var(--transition);
+        }
+
+        .probability.winner {
+            background: linear-gradient(135deg, rgba(0, 113, 227, 0.1), rgba(0, 113, 227, 0.05));
+            border-color: rgba(0, 113, 227, 0.2);
+        }
+
+        .prob-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .prob-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .confidence-badge {
+            text-align: center;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 10px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .analysis {
+            background: rgba(0, 0, 0, 0.02);
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--text-primary);
+            margin-top: 16px;
+        }
+
+        .analysis h4 {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 16px 0 8px 0;
+            color: var(--text-primary);
+        }
+
+        .analysis ul {
+            margin-left: 20px;
+            margin-top: 8px;
+        }
+
+        .analysis li {
+            margin-bottom: 6px;
+        }
+
+        .analysis strong {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Error */
+        .error {
+            background: rgba(255, 59, 48, 0.1);
+            border: 1px solid rgba(255, 59, 48, 0.2);
             padding: 20px;
-            color: #fca5a5;
+            border-radius: 12px;
+            color: #d70015;
             text-align: center;
         }
+
         .no-games {
             text-align: center;
-            padding: 60px 20px;
-            font-size: 1.2em;
-            color: #a0aec0;
+            padding: 80px 20px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
         }
-        .analysis-text {
-            margin-top: 15px;
-            padding: 15px;
-            background: rgba(255,255,255,0.03);
-            border-radius: 8px;
-            line-height: 1.6;
-            font-size: 0.95em;
-            color: #e2e8f0;
+
+        .no-games h2 {
+            font-size: 28px;
+            margin-bottom: 12px;
+            color: var(--text-primary);
         }
-        .analysis-text h4 {
-            margin: 10px 0 6px;
-            font-size: 1.05em;
-            color: #cbd5e1;
+
+        .no-games p {
+            color: var(--text-secondary);
+            font-size: 17px;
         }
-        .analysis-text ul {
-            margin: 6px 0 10px 18px;
-        }
+
+        /* Footer */
         footer {
+            margin-top: 64px;
+            padding: 32px;
             text-align: center;
-            margin-top: 60px;
-            padding: 30px 20px;
-            background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            border: 1px solid rgba(255,255,255,0.1);
-            color: #a0aec0;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
         }
+
         footer p {
-            margin: 10px 0;
-            font-size: 1em;
+            color: var(--text-secondary);
+            font-size: 15px;
+            margin: 8px 0;
         }
+
         footer a {
-            color: #667eea;
+            color: var(--accent);
             text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s ease;
+            font-weight: 500;
+            transition: var(--transition);
         }
+
         footer a:hover {
-            color: #764ba2;
-            text-decoration: underline;
+            color: var(--accent-hover);
         }
-        .github-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 36px;
+            }
+
+            .games-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn-group {
+                width: 100%;
+            }
+
+            .btn {
+                flex: 1;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🏒 SkateIQ</h1>
-            <p class="subtitle">AI-Powered NHL Predictions • Daily Matchup Analysis</p>
+            <div class="logo">🏒</div>
+            <h1>SkateIQ</h1>
+            <p class="subtitle">AI-Powered NHL Matchup Predictions</p>
         </header>
 
-        <div class="date-header" id="dateHeader">📅 Loading today's games...</div>
+        <div class="controls">
+            <div class="date-badge" id="dateHeader">Loading today's games...</div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="loadTodaysGames()">Refresh</button>
+            </div>
+        </div>
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>Fetching today's NHL schedule...</p>
+            <p class="loading-text">Fetching today's NHL schedule...</p>
         </div>
 
         <div class="games-grid" id="gamesGrid"></div>
-        
+
         <footer>
-            <p>Created by <strong>Ahmed Alami</strong></p>
+            <p>Built with care by <strong>Ahmed Alami</strong></p>
             <p>
-                <a href="https://github.com/A71as" target="_blank" class="github-link">
-                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-                    </svg>
-                    @A71as
-                </a>
+                <a href="https://github.com/A71as" target="_blank">@A71as on GitHub</a>
             </p>
         </footer>
     </div>
@@ -274,7 +461,6 @@ def get_html_template():
     <script>
         // Team emoji mapping
         const teamEmojis = {
-            // Metropolitan Division
             'Carolina Hurricanes': '🌀', 'Hurricanes': '🌀',
             'New Jersey Devils': '😈', 'Devils': '😈',
             'New York Rangers': '🗽', 'Rangers': '🗽',
@@ -283,8 +469,6 @@ def get_html_template():
             'Pittsburgh Penguins': '🐧', 'Penguins': '🐧',
             'Columbus Blue Jackets': '💥', 'Blue Jackets': '💥',
             'Washington Capitals': '🦅', 'Capitals': '🦅',
-            
-            // Atlantic Division
             'Boston Bruins': '🐻', 'Bruins': '🐻',
             'Florida Panthers': '🐆', 'Panthers': '🐆',
             'Toronto Maple Leafs': '🍁', 'Maple Leafs': '🍁',
@@ -293,8 +477,6 @@ def get_html_template():
             'Buffalo Sabres': '⚔️', 'Sabres': '⚔️',
             'Ottawa Senators': '🏛️', 'Senators': '🏛️',
             'Montreal Canadiens': '⚜️', 'Canadiens': '⚜️',
-            
-            // Central Division
             'Dallas Stars': '⭐', 'Stars': '⭐',
             'Colorado Avalanche': '🏔️', 'Avalanche': '🏔️',
             'Winnipeg Jets': '✈️', 'Jets': '✈️',
@@ -303,8 +485,6 @@ def get_html_template():
             'Nashville Predators': '🎸', 'Predators': '🎸',
             'Arizona Coyotes': '🌵', 'Coyotes': '🌵',
             'Chicago Blackhawks': '🪶', 'Blackhawks': '🪶',
-            
-            // Pacific Division
             'Vegas Golden Knights': '⚔️', 'Golden Knights': '⚔️',
             'Edmonton Oilers': '🛢️', 'Oilers': '🛢️',
             'Los Angeles Kings': '👑', 'Kings': '👑',
@@ -313,8 +493,6 @@ def get_html_template():
             'Seattle Kraken': '🦑', 'Kraken': '🦑',
             'Anaheim Ducks': '🦆', 'Ducks': '🦆',
             'San Jose Sharks': '🦈', 'Sharks': '🦈',
-            
-            // Special cases
             'Utah Hockey Club': '🏔️'
         };
         
@@ -328,17 +506,13 @@ def get_html_template():
             }
             
             try {
-                // Parse UTC time string (format: "2025-10-31T23:00:00Z")
                 const date = new Date(timeString);
-                
-                // Convert to local time with readable format
                 const options = {
                     hour: 'numeric',
                     minute: '2-digit',
                     hour12: true,
                     timeZoneName: 'short'
                 };
-                
                 return date.toLocaleTimeString('en-US', options);
             } catch (error) {
                 return timeString;
@@ -356,35 +530,44 @@ def get_html_template():
                     document.getElementById('gamesGrid').innerHTML = `
                         <div class="no-games">
                             <h2>No NHL games scheduled for today</h2>
-                            <p style="margin-top: 10px; color: #667eea;">Check back tomorrow for predictions!</p>
+                            <p>Check back tomorrow for predictions!</p>
                         </div>
                     `;
                     document.getElementById('dateHeader').textContent = 
-                        `📅 ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
+                        new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                     return;
                 }
                 
                 document.getElementById('dateHeader').textContent = 
-                    `📅 ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} • ${data.games.length} Games`;
+                    `${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} • ${data.games.length} Games`;
                 
                 const gamesGrid = document.getElementById('gamesGrid');
                 gamesGrid.innerHTML = data.games.map((game, index) => `
                     <div class="game-card" id="game-${index}">
-                        <div class="matchup-header">
+                        <div class="matchup">
                             <div class="team">
-                                <div class="team-name">${getTeamEmoji(game.away_team)} ${game.away_team} ${getTeamEmoji(game.away_team)}</div>
-                                <div class="team-location">✈️ Away ✈️</div>
+                                <div class="team-icon">${getTeamEmoji(game.away_team)}</div>
+                                <div class="team-info">
+                                    <div class="team-name">${game.away_team}</div>
+                                    <div class="team-badge">Away</div>
+                                </div>
                             </div>
                             <div class="vs">VS</div>
                             <div class="team">
-                                <div class="team-name">${getTeamEmoji(game.home_team)} ${game.home_team} ${getTeamEmoji(game.home_team)}</div>
-                                <div class="team-location">🏠 Home 🏠</div>
+                                <div class="team-icon">${getTeamEmoji(game.home_team)}</div>
+                                <div class="team-info">
+                                    <div class="team-name">${game.home_team}</div>
+                                    <div class="team-badge">Home</div>
+                                </div>
                             </div>
                         </div>
-                        <div class="game-time">🕒 ${formatGameTime(game.time)}</div>
-                        <button class="analyze-btn" onclick="analyzeGame(${index}, '${game.home_team}', '${game.away_team}')" id="btn-${index}">
-                            🤖 Get AI Prediction
+                        
+                        <div class="game-time">🕐 ${formatGameTime(game.time)}</div>
+                        
+                        <button class="btn btn-primary" style="width: 100%;" onclick="analyzeGame(${index}, '${game.home_team}', '${game.away_team}')" id="btn-${index}">
+                            Get AI Prediction
                         </button>
+                        
                         <div id="prediction-${index}"></div>
                     </div>
                 `).join('');
@@ -393,7 +576,7 @@ def get_html_template():
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('gamesGrid').innerHTML = `
                     <div class="error">
-                        <h3>❌ Error Loading Games</h3>
+                        <h3>Error Loading Games</h3>
                         <p>${error.message}</p>
                     </div>
                 `;
@@ -405,12 +588,14 @@ def get_html_template():
             const predictionDiv = document.getElementById(`prediction-${index}`);
             
             btn.disabled = true;
-            btn.textContent = '🧠 AI Analyzing...';
+            btn.textContent = 'Analyzing...';
             
             predictionDiv.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Analyzing matchup... (10-15 seconds)</p>
+                <div class="prediction-section">
+                    <div style="text-align: center; padding: 20px;">
+                        <div class="spinner" style="margin: 0 auto;"></div>
+                        <p style="margin-top: 12px; color: var(--text-secondary);">Analyzing matchup...</p>
+                    </div>
                 </div>
             `;
             
@@ -434,15 +619,14 @@ def get_html_template():
                 
             } catch (error) {
                 predictionDiv.innerHTML = `
-                    <div class="error">
-                        <h4>❌ Prediction Error</h4>
+                    <div class="error" style="margin-top: 16px;">
+                        <h4>Prediction Error</h4>
                         <p>${error.message}</p>
-                        <p style="margin-top: 10px; font-size: 0.9em;">Check your OpenAI API credits.</p>
                     </div>
                 `;
             } finally {
                 btn.disabled = false;
-                btn.textContent = '🔄 Refresh Prediction';
+                btn.textContent = 'Refresh Prediction';
             }
         }
 
@@ -450,12 +634,10 @@ def get_html_template():
             const predictionDiv = document.getElementById(`prediction-${index}`);
             const analysis = (data.analysis_text || data.analysis || '');
             
-            // Prefer server-parsed fields if available
             let homeProb = Number.isFinite(data.home_prob) ? Number(data.home_prob) : null;
             let awayProb = Number.isFinite(data.away_prob) ? Number(data.away_prob) : null;
             let confidence = Number.isFinite(data.confidence) ? Number(data.confidence) : null;
             
-            // Fallback to regex parsing if needed
             if (homeProb === null || awayProb === null) {
                 const homeProbMatch = analysis.match(/Home Team:\\s*(\\d+)%/i);
                 const awayProbMatch = analysis.match(/Away Team:\\s*(\\d+)%/i);
@@ -467,7 +649,6 @@ def get_html_template():
                 if (confidenceMatch) confidence = parseInt(confidenceMatch[1]);
             }
             
-            // Final defaults and clamp
             if (homeProb === null && awayProb === null) { homeProb = 50; awayProb = 50; }
             else if (homeProb === null && awayProb !== null) { homeProb = 100 - awayProb; }
             else if (homeProb !== null && awayProb === null) { awayProb = 100 - homeProb; }
@@ -485,21 +666,21 @@ def get_html_template():
             const awayWinner = awayProb > homeProb;
             
             predictionDiv.innerHTML = `
-                <div class="prediction">
-                    <div class="win-probabilities">
+                <div class="prediction-section">
+                    <div class="probabilities">
                         <div class="probability ${awayWinner ? 'winner' : ''}">
-                            <div class="probability-label">${getTeamEmoji(data.away_team)} ${data.away_team} ${getTeamEmoji(data.away_team)}</div>
-                            <div class="probability-value">${awayProb}% ✈️</div>
+                            <div class="prob-label">${getTeamEmoji(data.away_team)} ${data.away_team}</div>
+                            <div class="prob-value">${awayProb}%</div>
                         </div>
                         <div class="probability ${homeWinner ? 'winner' : ''}">
-                            <div class="probability-label">${getTeamEmoji(data.home_team)} ${data.home_team} ${getTeamEmoji(data.home_team)}</div>
-                            <div class="probability-value">${homeProb}% 🏠</div>
+                            <div class="prob-label">${getTeamEmoji(data.home_team)} ${data.home_team}</div>
+                            <div class="prob-value">${homeProb}%</div>
                         </div>
                     </div>
-                    <div class="confidence">
-                        🎯 Confidence: ${confidenceText}/10
+                    <div class="confidence-badge">
+                        Confidence: ${confidenceText}/10
                     </div>
-                    <div class="analysis-text">
+                    <div class="analysis">
                         ${formatAnalysis(analysis)}
                     </div>
                 </div>
@@ -514,8 +695,7 @@ def get_html_template():
             for (let raw of lines) {
                 const line = raw.trim();
                 if (!line) continue;
-                // Headings like **Projected Impact Players**:
-                    const hdr = line.match(/^\\*\\*(.+?)\\*\\*:?\\s*$/);
+                const hdr = line.match(/^\\*\\*(.+?)\\*\\*:?\\s*$/);
                 if (hdr) {
                     if (inList) { html += '</ul>'; inList = false; }
                     html += `<h4>${hdr[1]}</h4>`;
