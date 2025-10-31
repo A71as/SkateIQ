@@ -386,14 +386,68 @@ def get_html_template():
             margin-bottom: 16px;
         }
 
-        .analysis {
-            background: rgba(0, 0, 0, 0.02);
-            padding: 16px;
+        .analysis-toggle {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 12px;
+            margin-top: 16px;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .analysis-toggle:hover {
+            border-color: rgba(0, 113, 227, 0.3);
+        }
+
+        .analysis-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            cursor: pointer;
+            user-select: none;
+            background: rgba(0, 0, 0, 0.02);
+            transition: var(--transition);
+        }
+
+        .analysis-header:hover {
+            background: rgba(0, 113, 227, 0.05);
+        }
+
+        .analysis-header-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .analysis-arrow {
+            font-size: 12px;
+            color: var(--text-secondary);
+            transition: transform 0.3s ease;
+        }
+
+        .analysis-arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .analysis-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .analysis-content.open {
+            max-height: 2000px;
+        }
+
+        .analysis {
+            padding: 16px;
             font-size: 14px;
             line-height: 1.7;
             color: var(--text-primary);
-            margin-top: 16px;
         }
 
         .analysis h4 {
@@ -834,8 +888,19 @@ def get_html_template():
                     <div class="confidence-badge">
                         Confidence: ${confidenceText}/10
                     </div>
-                    <div class="analysis">
-                        ${formatAnalysis(analysis)}
+                    <div class="analysis-toggle">
+                        <div class="analysis-header" onclick="toggleAnalysis(${index})">
+                            <div class="analysis-header-text">
+                                <span>📊</span>
+                                <span>Detailed Analysis</span>
+                            </div>
+                            <div class="analysis-arrow" id="arrow-${index}">▼</div>
+                        </div>
+                        <div class="analysis-content" id="analysis-content-${index}">
+                            <div class="analysis">
+                                ${formatAnalysis(analysis)}
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -868,6 +933,14 @@ def get_html_template():
             }
             if (inList) { html += '</ul>'; }
             return html;
+        }
+
+        function toggleAnalysis(index) {
+            const content = document.getElementById(`analysis-content-${index}`);
+            const arrow = document.getElementById(`arrow-${index}`);
+            
+            content.classList.toggle('open');
+            arrow.classList.toggle('open');
         }
 
         window.addEventListener('load', async function() {
