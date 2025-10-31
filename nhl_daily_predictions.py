@@ -5,10 +5,12 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import uvicorn
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 from openai import OpenAI
 from dotenv import load_dotenv
+import hashlib
+import json
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +23,50 @@ SPORTSDB_API_BASE = "https://www.thesportsdb.com/api/v1/json"
 
 # Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+
+# Simple in-memory cache with TTL
+class PredictionCache:
+    def __init__(self, ttl_hours=6):
+        self.cache = {}
+        self.ttl = timedelta(hours=ttl_hours)
+    
+    def _get_key(self, home_team: str, away_team: str, date: str) -> str:
+        """Generate cache key from matchup details"""
+        data = f"{home_team}_{away_team}_{date}"
+        return hashlib.md5(data.encode()).hexdigest()
+    
+    def get(self, home_team: str, away_team: str, date: str) -> Optional[Dict]:
+        """Get cached prediction if not expired"""
+        key = self._get_key(home_team, away_team, date)
+        if key in self.cache:
+            entry = self.cache[key]
+            if datetime.now() - entry['timestamp'] < self.ttl:
+                return entry['data']
+            else:
+                # Remove expired entry
+                del self.cache[key]
+        return None
+    
+    def set(self, home_team: str, away_team: str, date: str, data: Dict):
+        """Store prediction in cache"""
+        key = self._get_key(home_team, away_team, date)
+        self.cache[key] = {
+            'data': data,
+            'timestamp': datetime.now()
+        }
+    
+    def clear_old_entries(self):
+        """Remove expired cache entries"""
+        now = datetime.now()
+        expired_keys = [
+            key for key, entry in self.cache.items()
+            if now - entry['timestamp'] >= self.ttl
+        ]
+        for key in expired_keys:
+            del self.cache[key]
+
+# Initialize cache (6 hour TTL - predictions valid for same day)
+prediction_cache = PredictionCache(ttl_hours=6)
 
 # Create FastAPI app
 app = FastAPI(
@@ -394,31 +440,45 @@ class MatchupAnalyzer:
                         "role": "system",
                         "content": """You are an expert NHL analyst writing in the engaging style of a beat reporter. Provide matchup analysis with win probabilities.
 
-Your response MUST include these sections in this exact order and formatting:
+Your response MUST follow this EXACT format and structure:
 
 **WIN PROBABILITY**
 Home Team: XX%
 Away Team: YY%
 
 **ANALYSIS**
-Write a 1–2 sentence lede like a game preview. Then provide 3–5 concise, data-driven bullets on:
-- Current form and last-10 trends
-- Goal differential and goals for/against context
-- Home vs road splits relevant to this matchup
-- Schedule/rest factors implied by records (do NOT invent injuries)
-- Style/tempo implications derived from provided stats only
+[Opening paragraph: 2-3 sentences setting up the matchup like a game preview, mentioning teams, their status/streaks, and what makes this game compelling. Do NOT use bold text or bullets here.]
 
-Then add short sub-sections within ANALYSIS:
-**Projected Impact Players**: list 1–2 per team with a brief reason (goals/assists likelihood based on form). If uncertain on names, keep it generic (e.g., "top-line winger").
-**Projected Starting Goalies**: Home – NAME (projected), Away – NAME (projected). If unknown, say "TBD" and note to monitor pregame reports.
-**Injuries/Notes**: Only mention if widely known and non-speculative; otherwise say "No notable injuries confirmed as of today." Do NOT make up injuries.
+**Current Form and Last-10 Trends:** [1-2 sentences comparing both teams' recent records and momentum]
+**Goal Differential and Goals Context:** [1-2 sentences on goals scored/conceded and what it reveals about each team's style]
+**Home vs Road Splits:** [1-2 sentences on home team's home record and away team's road record]
+**Schedule/Rest Factors:** [1 sentence on any momentum or rest implications from their records]
+**Style/Tempo Implications:** [1-2 sentences predicting game pace and style based on stats]
 
-The ANALYSIS section must NOT restate percentages or confidence.
+**Projected Impact Players:**
+- Home: [Player name] is [brief reason for impact potential]
+- Away: [Player name] is [brief reason for impact potential]
+
+**Projected Starting Goalies:**
+- Home: [Goalie name] (projected)
+- Away: [Goalie name] (projected)
+Monitor pregame reports for confirmed starters.
+
+**Injuries/Notes:**
+[Only mention widely confirmed injuries; otherwise state: "No notable injuries confirmed as of today."]
 
 **CONFIDENCE**
-X/10 – Brief reasoning
+X/10 – [Brief reasoning in one sentence]
 
-Be concise and grounded. Percentages must add up to 100%."""
+CRITICAL FORMATTING RULES:
+- Use **Bold Text:** for all section headers (Current Form, Goal Differential, etc.)
+- Use bullet points (- ) ONLY for Projected Impact Players and Projected Starting Goalies sections
+- Do NOT use bullets or bold for the opening paragraph
+- Keep each section to 1-2 sentences maximum
+- Do NOT restate percentages or confidence scores in the ANALYSIS section
+- Use actual player names from the roster data provided
+- Percentages must add up to 100%
+- Be factual and grounded in provided stats only"""
                     },
                     {
                         "role": "user",
@@ -580,9 +640,86 @@ Streak: {away_stats['streak']}"""
 # Initialize analyzer
 analyzer = MatchupAnalyzer(client) if client else None
 
-# Import and setup routes (needed for both uvicorn direct run and __main__)
-from nhl_routes import setup_routes
-setup_routes(app, analyzer)
+# Setup routes directly in this file to avoid circular imports
+from fastapi.responses import HTMLResponse
+from nhl_html import get_html_template
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    """Home page showing today's NHL games"""
+    return get_html_template()
+
+@app.get("/api/todays-games")
+async def get_todays_games():
+    """Get today's NHL games schedule"""
+    try:
+        fetcher = NHLDataFetcher()
+        games = fetcher.get_todays_games()
+        return {
+            "success": True,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "games": games,
+            "count": len(games)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch today's games: {str(e)}"
+        )
+
+@app.post("/api/analyze")
+async def analyze_matchup(request: dict):
+    """Analyze matchup and generate AI prediction"""
+    
+    if not analyzer:
+        raise HTTPException(
+            status_code=500,
+            detail="Analyzer not initialized. Please configure OPENAI_API_KEY."
+        )
+    
+    try:
+        home_team = request.get("home_team", "")
+        away_team = request.get("away_team", "")
+        game_date = request.get("game_date") or datetime.now().strftime("%Y-%m-%d")
+        
+        # Check cache first
+        cached_result = prediction_cache.get(home_team, away_team, game_date)
+        if cached_result:
+            print(f"💾 Cache hit for {home_team} vs {away_team} on {game_date}")
+            return cached_result
+        
+        print(f"\n🔍 Analyzing: {home_team} vs {away_team}")
+        result = analyzer.analyze_matchup(
+            home_team=home_team,
+            away_team=away_team,
+            game_date=game_date
+        )
+        
+        # Store in cache if successful
+        if "error" not in result:
+            prediction_cache.set(home_team, away_team, game_date, result)
+            print(f"💾 Cached prediction for {home_team} vs {away_team}")
+        
+        print(f"✅ Analysis complete!")
+        return result
+    except Exception as e:
+        print(f"❌ Error during analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Analysis failed: {str(e)}"
+        )
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "service": "NHL Daily Predictions",
+        "openai_configured": client is not None,
+        "timestamp": datetime.now().isoformat()
+    }
 
 if __name__ == "__main__":
     print("🏒 NHL Daily Predictions")

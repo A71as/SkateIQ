@@ -100,6 +100,13 @@ def get_html_template():
             font-weight: bold;
             margin-bottom: 5px;
         }
+        .team-location {
+            font-size: 0.85em;
+            color: #a0aec0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 5px;
+        }
         .vs {
             font-size: 1.2em;
             color: #667eea;
@@ -204,13 +211,42 @@ def get_html_template():
         .analysis-text ul {
             margin: 6px 0 10px 18px;
         }
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            padding: 30px 20px;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #a0aec0;
+        }
+        footer p {
+            margin: 10px 0;
+            font-size: 1em;
+        }
+        footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        footer a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+        .github-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🏒 NHL Daily Matchup Predictions</h1>
-            <p class="subtitle">AI-Powered Win Probability Analysis • Updates Daily</p>
+            <h1>🏒 SkateIQ</h1>
+            <p class="subtitle">AI-Powered NHL Predictions • Daily Matchup Analysis</p>
         </header>
 
         <div class="date-header" id="dateHeader">📅 Loading today's games...</div>
@@ -221,9 +257,94 @@ def get_html_template():
         </div>
 
         <div class="games-grid" id="gamesGrid"></div>
+        
+        <footer>
+            <p>Created by <strong>Ahmed Alami</strong></p>
+            <p>
+                <a href="https://github.com/A71as" target="_blank" class="github-link">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                    @A71as
+                </a>
+            </p>
+        </footer>
     </div>
 
     <script>
+        // Team emoji mapping
+        const teamEmojis = {
+            // Metropolitan Division
+            'Carolina Hurricanes': '🌀', 'Hurricanes': '🌀',
+            'New Jersey Devils': '😈', 'Devils': '😈',
+            'New York Rangers': '🗽', 'Rangers': '🗽',
+            'New York Islanders': '🏝️', 'Islanders': '🏝️',
+            'Philadelphia Flyers': '🧡', 'Flyers': '🧡',
+            'Pittsburgh Penguins': '🐧', 'Penguins': '🐧',
+            'Columbus Blue Jackets': '💥', 'Blue Jackets': '💥',
+            'Washington Capitals': '🦅', 'Capitals': '🦅',
+            
+            // Atlantic Division
+            'Boston Bruins': '🐻', 'Bruins': '🐻',
+            'Florida Panthers': '🐆', 'Panthers': '🐆',
+            'Toronto Maple Leafs': '🍁', 'Maple Leafs': '🍁',
+            'Tampa Bay Lightning': '⚡', 'Lightning': '⚡',
+            'Detroit Red Wings': '🪽', 'Red Wings': '🪽',
+            'Buffalo Sabres': '⚔️', 'Sabres': '⚔️',
+            'Ottawa Senators': '🏛️', 'Senators': '🏛️',
+            'Montreal Canadiens': '⚜️', 'Canadiens': '⚜️',
+            
+            // Central Division
+            'Dallas Stars': '⭐', 'Stars': '⭐',
+            'Colorado Avalanche': '🏔️', 'Avalanche': '🏔️',
+            'Winnipeg Jets': '✈️', 'Jets': '✈️',
+            'Minnesota Wild': '🌲', 'Wild': '🌲',
+            'St. Louis Blues': '🎺', 'Blues': '🎺',
+            'Nashville Predators': '🎸', 'Predators': '🎸',
+            'Arizona Coyotes': '🌵', 'Coyotes': '🌵',
+            'Chicago Blackhawks': '🪶', 'Blackhawks': '🪶',
+            
+            // Pacific Division
+            'Vegas Golden Knights': '⚔️', 'Golden Knights': '⚔️',
+            'Edmonton Oilers': '🛢️', 'Oilers': '🛢️',
+            'Los Angeles Kings': '👑', 'Kings': '👑',
+            'Vancouver Canucks': '🐋', 'Canucks': '🐋',
+            'Calgary Flames': '🔥', 'Flames': '🔥',
+            'Seattle Kraken': '🦑', 'Kraken': '🦑',
+            'Anaheim Ducks': '🦆', 'Ducks': '🦆',
+            'San Jose Sharks': '🦈', 'Sharks': '🦈',
+            
+            // Special cases
+            'Utah Hockey Club': '🏔️'
+        };
+        
+        function getTeamEmoji(teamName) {
+            return teamEmojis[teamName] || '🏒';
+        }
+        
+        function formatGameTime(timeString) {
+            if (!timeString || timeString === 'TBD' || timeString === 'Time TBD') {
+                return 'Time TBD';
+            }
+            
+            try {
+                // Parse UTC time string (format: "2025-10-31T23:00:00Z")
+                const date = new Date(timeString);
+                
+                // Convert to local time with readable format
+                const options = {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZoneName: 'short'
+                };
+                
+                return date.toLocaleTimeString('en-US', options);
+            } catch (error) {
+                return timeString;
+            }
+        }
+        
         async function loadTodaysGames() {
             try {
                 const response = await fetch('/api/todays-games');
@@ -251,14 +372,16 @@ def get_html_template():
                     <div class="game-card" id="game-${index}">
                         <div class="matchup-header">
                             <div class="team">
-                                <div class="team-name">✈️ ${game.away_team}</div>
+                                <div class="team-name">${getTeamEmoji(game.away_team)} ${game.away_team} ${getTeamEmoji(game.away_team)}</div>
+                                <div class="team-location">✈️ Away ✈️</div>
                             </div>
                             <div class="vs">VS</div>
                             <div class="team">
-                                <div class="team-name">🏠 ${game.home_team}</div>
+                                <div class="team-name">${getTeamEmoji(game.home_team)} ${game.home_team} ${getTeamEmoji(game.home_team)}</div>
+                                <div class="team-location">🏠 Home 🏠</div>
                             </div>
                         </div>
-                        <div class="game-time">🕒 ${game.time || 'Time TBD'}</div>
+                        <div class="game-time">🕒 ${formatGameTime(game.time)}</div>
                         <button class="analyze-btn" onclick="analyzeGame(${index}, '${game.home_team}', '${game.away_team}')" id="btn-${index}">
                             🤖 Get AI Prediction
                         </button>
@@ -365,12 +488,12 @@ def get_html_template():
                 <div class="prediction">
                     <div class="win-probabilities">
                         <div class="probability ${awayWinner ? 'winner' : ''}">
-                            <div class="probability-label">✈️ ${data.away_team}</div>
-                            <div class="probability-value">${awayProb}%</div>
+                            <div class="probability-label">${getTeamEmoji(data.away_team)} ${data.away_team} ${getTeamEmoji(data.away_team)}</div>
+                            <div class="probability-value">${awayProb}% ✈️</div>
                         </div>
                         <div class="probability ${homeWinner ? 'winner' : ''}">
-                            <div class="probability-label">🏠 ${data.home_team}</div>
-                            <div class="probability-value">${homeProb}%</div>
+                            <div class="probability-label">${getTeamEmoji(data.home_team)} ${data.home_team} ${getTeamEmoji(data.home_team)}</div>
+                            <div class="probability-value">${homeProb}% 🏠</div>
                         </div>
                     </div>
                     <div class="confidence">
@@ -398,7 +521,7 @@ def get_html_template():
                     html += `<h4>${hdr[1]}</h4>`;
                     continue;
                 }
-                const m = line.match(/^-\s+(.+)/);
+                const m = line.match(/^-\\s+(.+)/);
                 if (m) {
                     if (!inList) { html += '<ul>'; inList = true; }
                     const item = m[1].replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
