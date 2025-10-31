@@ -580,6 +580,10 @@ Streak: {away_stats['streak']}"""
 # Initialize analyzer
 analyzer = MatchupAnalyzer(client) if client else None
 
+# Import and setup routes (needed for both uvicorn direct run and __main__)
+from nhl_routes import setup_routes
+setup_routes(app, analyzer)
+
 if __name__ == "__main__":
     print("🏒 NHL Daily Predictions")
     print("=" * 50)
@@ -593,9 +597,5 @@ if __name__ == "__main__":
     
     print("🌐 Starting server on http://127.0.0.1:8001")
     print("=" * 50)
-    
-    # Import routes after app is created
-    from nhl_routes import setup_routes
-    setup_routes(app, analyzer)
     
     uvicorn.run(app, host="127.0.0.1", port=8001)
