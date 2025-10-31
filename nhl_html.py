@@ -97,6 +97,79 @@ def get_html_template():
             flex-wrap: wrap;
         }
 
+        .accuracy-banner {
+            background: linear-gradient(135deg, rgba(0, 113, 227, 0.08), rgba(52, 199, 89, 0.08));
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            padding: 20px 32px;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 113, 227, 0.12);
+            margin-bottom: 32px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: var(--shadow-md);
+            gap: 24px;
+        }
+
+        .accuracy-stat {
+            text-align: center;
+        }
+
+        .accuracy-value {
+            font-size: 36px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), #34c759);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 4px;
+        }
+
+        .accuracy-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .date-selector {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .date-selector label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .date-selector input[type="date"] {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-family: inherit;
+            font-size: 14px;
+            background: white;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .date-selector input[type="date"]:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1);
+        }
+
         .date-badge {
             background: var(--bg-card);
             backdrop-filter: blur(20px) saturate(180%);
@@ -436,10 +509,34 @@ def get_html_template():
             <p class="subtitle">AI-Powered NHL Matchup Predictions</p>
         </header>
 
+        <div class="accuracy-banner" id="accuracyBanner">
+            <div class="accuracy-stat">
+                <div class="accuracy-value" id="accuracyPercentage">—%</div>
+                <div class="accuracy-label">Accuracy</div>
+            </div>
+            <div class="accuracy-stat">
+                <div class="accuracy-value" id="correctPredictions">—</div>
+                <div class="accuracy-label">Correct</div>
+            </div>
+            <div class="accuracy-stat">
+                <div class="accuracy-value" id="totalPredictions">—</div>
+                <div class="accuracy-label">Total</div>
+            </div>
+            <div class="accuracy-stat">
+                <div class="accuracy-value" id="recentPredictions">—</div>
+                <div class="accuracy-label">This Week</div>
+            </div>
+        </div>
+
         <div class="controls">
+            <div class="date-selector">
+                <label for="gameDate">Select Date:</label>
+                <input type="date" id="gameDate" onchange="loadGamesByDate()">
+            </div>
             <div class="date-badge" id="dateHeader">Loading today's games...</div>
             <div class="btn-group">
-                <button class="btn btn-secondary" onclick="loadTodaysGames()">Refresh</button>
+                <button class="btn btn-secondary" onclick="loadTodaysGames()">Today</button>
+                <button class="btn btn-secondary" onclick="loadGamesByDate()">Refresh</button>
             </div>
         </div>
 
@@ -519,27 +616,80 @@ def get_html_template():
             }
         }
         
-        async function loadTodaysGames() {
+        // Fetch and display accuracy stats
+        async function fetchAccuracy() {
             try {
-                const response = await fetch('/api/todays-games');
+                const response = await fetch('/api/accuracy');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const acc = data.accuracy;
+                    document.getElementById('accuracyPercentage').textContent = 
+                        acc.accuracy_percentage.toFixed(1) + '%';
+                    document.getElementById('correctPredictions').textContent = 
+                        acc.correct_predictions;
+                    document.getElementById('totalPredictions').textContent = 
+                        acc.total_predictions;
+                    document.getElementById('recentPredictions').textContent = 
+                        acc.recent_predictions.length;
+                }
+            } catch (error) {
+                console.error('Error fetching accuracy:', error);
+            }
+        }
+        
+        // Initialize date picker with today's date
+        function initializeDatePicker() {
+            const today = new Date();
+            const dateInput = document.getElementById('gameDate');
+            
+            // Set today as default
+            dateInput.value = today.toISOString().split('T')[0];
+            
+            // Set min to today, max to 7 days from now
+            dateInput.min = today.toISOString().split('T')[0];
+            const maxDate = new Date();
+            maxDate.setDate(today.getDate() + 7);
+            dateInput.max = maxDate.toISOString().split('T')[0];
+        }
+        
+        async function loadTodaysGames() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('gameDate').value = today;
+            await loadGamesByDate();
+        }
+        
+        async function loadGamesByDate() {
+            const dateInput = document.getElementById('gameDate');
+            const selectedDate = dateInput.value;
+            
+            if (!selectedDate) {
+                await loadTodaysGames();
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/games/${selectedDate}`);
                 const data = await response.json();
                 
                 document.getElementById('loading').style.display = 'none';
                 
-                if (!data.success || data.games.length === 0) {
+                if (!data.success || !data.games || data.games.length === 0) {
                     document.getElementById('gamesGrid').innerHTML = `
                         <div class="no-games">
-                            <h2>No NHL games scheduled for today</h2>
-                            <p>Check back tomorrow for predictions!</p>
+                            <h2>No NHL games scheduled for ${selectedDate}</h2>
+                            <p>Try a different date!</p>
                         </div>
                     `;
+                    const displayDate = new Date(selectedDate + 'T12:00:00');
                     document.getElementById('dateHeader').textContent = 
-                        new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                        displayDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                     return;
                 }
                 
+                const displayDate = new Date(selectedDate + 'T12:00:00');
                 document.getElementById('dateHeader').textContent = 
-                    `${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} • ${data.games.length} Games`;
+                    `${displayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} • ${data.games.length} Games`;
                 
                 const gamesGrid = document.getElementById('gamesGrid');
                 gamesGrid.innerHTML = data.games.map((game, index) => `
@@ -564,7 +714,7 @@ def get_html_template():
                         
                         <div class="game-time">🕐 ${formatGameTime(game.time)}</div>
                         
-                        <button class="btn btn-primary" style="width: 100%;" onclick="analyzeGame(${index}, '${game.home_team}', '${game.away_team}')" id="btn-${index}">
+                        <button class="btn btn-primary" style="width: 100%;" onclick="analyzeGame(${index}, '${game.home_team}', '${game.away_team}', ${game.game_id || 0})" id="btn-${index}">
                             Get AI Prediction
                         </button>
                         
@@ -583,7 +733,7 @@ def get_html_template():
             }
         }
 
-        async function analyzeGame(index, homeTeam, awayTeam) {
+        async function analyzeGame(index, homeTeam, awayTeam, gameId) {
             const btn = document.getElementById(`btn-${index}`);
             const predictionDiv = document.getElementById(`prediction-${index}`);
             
@@ -605,7 +755,8 @@ def get_html_template():
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         home_team: homeTeam,
-                        away_team: awayTeam
+                        away_team: awayTeam,
+                        game_id: gameId
                     })
                 });
                 
@@ -616,6 +767,9 @@ def get_html_template():
                 
                 const data = await response.json();
                 displayPrediction(index, data);
+                
+                // Refresh accuracy after prediction
+                await fetchAccuracy();
                 
             } catch (error) {
                 predictionDiv.innerHTML = `
@@ -716,7 +870,11 @@ def get_html_template():
             return html;
         }
 
-        window.addEventListener('load', loadTodaysGames);
+        window.addEventListener('load', async function() {
+            initializeDatePicker();
+            await fetchAccuracy();
+            await loadTodaysGames();
+        });
     </script>
 </body>
 </html>

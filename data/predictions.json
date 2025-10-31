@@ -1,0 +1,21 @@
+{
+  "predictions": [
+    {
+      "id": "ecdad38c9e277dfa54f983fd94cac611",
+      "home_team": "Vegas Golden Knights",
+      "away_team": "Colorado Avalanche",
+      "game_date": "2025-10-31",
+      "home_prob": 52,
+      "away_prob": 48,
+      "confidence": 7,
+      "predicted_winner": "home",
+      "created_at": "2025-10-31T14:47:00.399687",
+      "actual_winner": null,
+      "is_correct": null
+    }
+  ],
+  "accuracy": {
+    "total": 0,
+    "correct": 0
+  }
+}
