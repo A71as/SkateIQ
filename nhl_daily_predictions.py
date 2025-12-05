@@ -46,6 +46,68 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 NHL_API_BASE = "https://api-web.nhle.com/v1"  # For schedules and live scores
 MONEYPUCK_BASE = "https://moneypuck.com"  # For team stats and analytics
 
+# Team name normalization - map short names to full names
+TEAM_NAME_MAP = {
+    # Short name -> Full name
+    "Ducks": "Anaheim Ducks",
+    "Bruins": "Boston Bruins",
+    "Sabres": "Buffalo Sabres",
+    "Flames": "Calgary Flames",
+    "Hurricanes": "Carolina Hurricanes",
+    "Blackhawks": "Chicago Blackhawks",
+    "Avalanche": "Colorado Avalanche",
+    "Blue Jackets": "Columbus Blue Jackets",
+    "Stars": "Dallas Stars",
+    "Red Wings": "Detroit Red Wings",
+    "Oilers": "Edmonton Oilers",
+    "Panthers": "Florida Panthers",
+    "Kings": "Los Angeles Kings",
+    "Wild": "Minnesota Wild",
+    "Canadiens": "Montreal Canadiens",
+    "Montréal Canadiens": "Montreal Canadiens",
+    "Predators": "Nashville Predators",
+    "Devils": "New Jersey Devils",
+    "Islanders": "New York Islanders",
+    "Rangers": "New York Rangers",
+    "Senators": "Ottawa Senators",
+    "Flyers": "Philadelphia Flyers",
+    "Penguins": "Pittsburgh Penguins",
+    "Sharks": "San Jose Sharks",
+    "Kraken": "Seattle Kraken",
+    "Blues": "St. Louis Blues",
+    "Lightning": "Tampa Bay Lightning",
+    "Maple Leafs": "Toronto Maple Leafs",
+    "Canucks": "Vancouver Canucks",
+    "Golden Knights": "Vegas Golden Knights",
+    "Capitals": "Washington Capitals",
+    "Jets": "Winnipeg Jets",
+    "Mammoth": "Utah Hockey Club",  # Utah's short name
+    "Hockey Club": "Utah Hockey Club",
+    "Coyotes": "Arizona Coyotes",
+}
+
+def normalize_team_name(team_name: str) -> str:
+    """Convert any team name variation to the full official name"""
+    if not team_name:
+        return team_name
+    
+    # Already full name
+    if team_name in ["Anaheim Ducks", "Boston Bruins", "Buffalo Sabres", "Calgary Flames",
+                     "Carolina Hurricanes", "Chicago Blackhawks", "Colorado Avalanche",
+                     "Columbus Blue Jackets", "Dallas Stars", "Detroit Red Wings",
+                     "Edmonton Oilers", "Florida Panthers", "Los Angeles Kings",
+                     "Minnesota Wild", "Montreal Canadiens", "Nashville Predators",
+                     "New Jersey Devils", "New York Islanders", "New York Rangers",
+                     "Ottawa Senators", "Philadelphia Flyers", "Pittsburgh Penguins",
+                     "San Jose Sharks", "Seattle Kraken", "St. Louis Blues",
+                     "Tampa Bay Lightning", "Toronto Maple Leafs", "Vancouver Canucks",
+                     "Vegas Golden Knights", "Washington Capitals", "Winnipeg Jets",
+                     "Utah Hockey Club", "Arizona Coyotes"]:
+        return team_name
+    
+    # Map from short name
+    return TEAM_NAME_MAP.get(team_name, team_name)
+
 # Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
@@ -796,9 +858,12 @@ async def analyze_matchup(request: dict):
         )
     
     try:
-        home_team = request.get("home_team", "")
-        away_team = request.get("away_team", "")
+        # Normalize team names (e.g., "Mammoth" -> "Utah Hockey Club")
+        home_team = normalize_team_name(request.get("home_team", ""))
+        away_team = normalize_team_name(request.get("away_team", ""))
         game_date = request.get("game_date") or datetime.now().strftime("%Y-%m-%d")
+        
+        print(f"📝 Normalized teams: {request.get('away_team')} -> {away_team}, {request.get('home_team')} -> {home_team}")
         
         # Check if predictions are locked for this game
         try:
