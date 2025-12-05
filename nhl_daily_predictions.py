@@ -222,9 +222,13 @@ class NHLDataFetcher:
                 away_team = game.get("awayTeam", {})
                 home_team = game.get("homeTeam", {})
                 
+                # Get full team names (e.g., "Vancouver Canucks" not just "Canucks")
+                home_full_name = home_team.get("commonName", {}).get("default", "") or home_team.get("placeName", {}).get("default", "") + " " + home_team.get("name", {}).get("default", "")
+                away_full_name = away_team.get("commonName", {}).get("default", "") or away_team.get("placeName", {}).get("default", "") + " " + away_team.get("name", {}).get("default", "")
+                
                 game_data = {
-                    "home_team": home_team.get("name", {}).get("default", ""),
-                    "away_team": away_team.get("name", {}).get("default", ""),
+                    "home_team": home_full_name.strip(),
+                    "away_team": away_full_name.strip(),
                     "time": game.get("startTimeUTC", "TBD"),
                     "date": today,
                     "event_id": str(game.get("id", "")),
