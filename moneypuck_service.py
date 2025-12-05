@@ -36,28 +36,35 @@ class MoneyPuckService:
             "Detroit Red Wings": "DET",
             "Edmonton Oilers": "EDM",
             "Florida Panthers": "FLA",
-            "Los Angeles Kings": "L.A",
+            "Los Angeles Kings": "LAK",
             "Minnesota Wild": "MIN",
             "Montreal Canadiens": "MTL",
             "Montréal Canadiens": "MTL",
             "Nashville Predators": "NSH",
-            "New Jersey Devils": "N.J",
+            "New Jersey Devils": "NJD",
             "New York Islanders": "NYI",
             "New York Rangers": "NYR",
             "Ottawa Senators": "OTT",
             "Philadelphia Flyers": "PHI",
             "Pittsburgh Penguins": "PIT",
-            "San Jose Sharks": "S.J",
+            "San Jose Sharks": "SJS",
             "Seattle Kraken": "SEA",
             "St. Louis Blues": "STL",
-            "Tampa Bay Lightning": "T.B",
+            "Tampa Bay Lightning": "TBL",
             "Toronto Maple Leafs": "TOR",
             "Vancouver Canucks": "VAN",
             "Vegas Golden Knights": "VGK",
             "Washington Capitals": "WSH",
             "Winnipeg Jets": "WPG",
+            # Utah Hockey Club (2024-25 season, formerly Arizona Coyotes)
             "Utah Hockey Club": "UTA",
+            # Arizona Coyotes (historical, relocated to Utah in 2024)
             "Arizona Coyotes": "ARI"
+        }
+        
+        # Special case: Utah uses Arizona's historical data for older seasons
+        self.historical_mapping = {
+            "Utah Hockey Club": ["UTA", "ARI"]  # Try UTA first, fallback to ARI for historical data
         }
         
         # Reverse mapping for display names
@@ -118,15 +125,27 @@ class MoneyPuckService:
         try:
             df = self._get_team_data()
             
-            # Get team abbreviation
-            team_abbrev = self.team_mapping.get(team_name, team_name[:3].upper())
+            # Get team abbreviation(s) - handle special cases like Utah
+            abbrevs_to_try = []
+            if team_name in self.historical_mapping:
+                abbrevs_to_try = self.historical_mapping[team_name]
+            else:
+                abbrevs_to_try = [self.team_mapping.get(team_name, team_name[:3].upper())]
             
-            # Find team in data - filter for 'all' situations for overall stats
-            team_row = df[(df['team'] == team_abbrev) & (df['situation'] == 'all')]
+            # Try each abbreviation until we find data
+            team_row = None
+            team_abbrev = abbrevs_to_try[0]  # Default to first option
             
-            if team_row.empty:
-                logger.warning(f"Team {team_name} ({team_abbrev}) not found in MoneyPuck data")
-                return self._get_default_stats(team_name, team_abbrev)
+            for abbrev in abbrevs_to_try:
+                team_row = df[(df['team'] == abbrev) & (df['situation'] == 'all')]
+                if not team_row.empty:
+                    team_abbrev = abbrev
+                    logger.info(f"Found {team_name} as {abbrev} in MoneyPuck data")
+                    break
+            
+            if team_row is None or team_row.empty:
+                logger.warning(f"Team {team_name} not found in MoneyPuck data (tried: {abbrevs_to_try})")
+                return self._get_default_stats(team_name, abbrevs_to_try[0])
             
             row = team_row.iloc[0]
             
