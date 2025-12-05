@@ -1,9 +1,9 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 import uvicorn
 import os
@@ -14,9 +14,14 @@ from dotenv import load_dotenv
 import hashlib
 import json
 from pathlib import Path
+import asyncio
+import logging
+
+# Live scores import
+from live_scores import LiveScoreService, LiveScoreUpdater
 
 # Database and auth imports
-from database import get_db, Prediction, AccuracyStats, User, update_accuracy_stats
+from database import get_db, Prediction, AccuracyStats, User, update_accuracy_stats, SessionLocal
 from auth import (
     get_current_user, 
     require_current_user, 
@@ -82,6 +87,32 @@ class PredictionCache:
 # Initialize cache (6 hour TTL - predictions valid for same day)
 prediction_cache = PredictionCache(ttl_hours=6)
 
+# Initialize live score services
+live_score_service = LiveScoreService()
+live_score_updater = None  # Will be initialized at startup
+
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except:
+                # Remove disconnected clients
+                self.active_connections.remove(connection)
+
+manager = ConnectionManager()
+
 # Create FastAPI app
 app = FastAPI(
     title="NHL Daily Predictions",
@@ -97,6 +128,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Application startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    """Initialize live score updater on startup"""
+    global live_score_updater
+    print("🚀 Starting live score updater...")
+    live_score_updater = LiveScoreUpdater(live_score_service, manager)
+    asyncio.create_task(live_score_updater.start_monitoring())
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean shutdown of live score updater"""
+    global live_score_updater
+    if live_score_updater:
+        print("🛑 Stopping live score updater...")
+        await live_score_updater.stop_monitoring()
 
 class MatchupRequest(BaseModel):
     home_team: str
@@ -681,6 +729,15 @@ async def analytics_dashboard():
     from analytics_html import get_analytics_html_template
     return get_analytics_html_template()
 
+@app.get("/live-scores-test", response_class=HTMLResponse)
+async def live_scores_test():
+    """Serve the live scores test page"""
+    try:
+        with open("test_live_scores.html", "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Test page not found")
+
 @app.get("/api/games/{date}")
 async def get_games_by_date(date: str):
     """Get NHL games for a specific date (YYYY-MM-DD format)"""
@@ -763,6 +820,23 @@ async def analyze_matchup(request: dict):
         home_team = request.get("home_team", "")
         away_team = request.get("away_team", "")
         game_date = request.get("game_date") or datetime.now().strftime("%Y-%m-%d")
+        
+        # Check if predictions are locked for this game
+        try:
+            prediction_locks = await live_score_service.check_prediction_locks()
+            for lock in prediction_locks:
+                if (lock.get("home_team") == home_team and 
+                    lock.get("away_team") == away_team and 
+                    lock.get("is_locked", False)):
+                    raise HTTPException(
+                        status_code=423,  # 423 Locked
+                        detail=f"Predictions are locked for {away_team} @ {home_team}. Game has started or is in progress."
+                    )
+        except HTTPException:
+            raise
+        except Exception as e:
+            # If live score service fails, log but don't block predictions
+            print(f"⚠️ Warning: Could not check prediction locks: {e}")
         
         # Check cache first
         cached_result = prediction_cache.get(home_team, away_team, game_date)
@@ -854,13 +928,25 @@ async def get_accuracy_stats(db: Session = Depends(get_db)):
         update_accuracy_stats(db)
         db.refresh(stats)
         
+        # Calculate accuracy percentages from available fields
+        last_7_days_accuracy = round(
+            (stats.last_7_days_correct / stats.last_7_days_total * 100) 
+            if stats.last_7_days_total > 0 else 0, 1
+        )
+        last_30_days_accuracy = round(
+            (stats.last_30_days_correct / stats.last_30_days_total * 100) 
+            if stats.last_30_days_total > 0 else 0, 1
+        )
+        
         return {
             "success": True,
             "total_predictions": stats.total_predictions,
             "correct_predictions": stats.correct_predictions,
             "accuracy_percentage": round(stats.accuracy_percentage, 1),
-            "last_7_days_accuracy": round(stats.last_7_days_accuracy or 0, 1),
-            "last_30_days_accuracy": round(stats.last_30_days_accuracy or 0, 1),
+            "last_7_days_accuracy": last_7_days_accuracy,
+            "last_30_days_accuracy": last_30_days_accuracy,
+            "last_7_days_total": stats.last_7_days_total,
+            "last_30_days_total": stats.last_30_days_total,
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
@@ -1103,6 +1189,100 @@ async def get_unresolved_predictions(days_back: int = 7, current_user: User = De
             detail=f"Failed to get unresolved predictions: {str(e)}"
         )
 
+# Live Scores WebSocket endpoint
+@app.websocket("/ws/live-scores")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time live score updates"""
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive and listen for client messages
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+# Live Scores REST endpoints
+@app.get("/api/live-scores")
+async def get_live_scores():
+    """Get current live scores for all active games"""
+    try:
+        live_scores = await live_score_service.get_live_scores()
+        return {
+            "success": True,
+            "live_scores": live_scores,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch live scores: {str(e)}"
+        )
+
+@app.get("/api/live-scores/{game_id}")
+async def get_game_live_score(game_id: str):
+    """Get live score for a specific game"""
+    try:
+        game_summary = await live_score_service.get_game_summary(game_id)
+        if not game_summary:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Game {game_id} not found or not active"
+            )
+        
+        return {
+            "success": True,
+            "game": game_summary,
+            "timestamp": datetime.now().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch game {game_id}: {str(e)}"
+        )
+
+@app.post("/api/live-scores/refresh")
+async def refresh_live_scores():
+    """Manually trigger live scores refresh"""
+    try:
+        live_scores = await live_score_service.get_live_scores()
+        
+        # Broadcast to all connected WebSocket clients
+        await manager.broadcast({
+            "type": "live_scores_update",
+            "data": live_scores,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        return {
+            "success": True,
+            "message": "Live scores refreshed and broadcasted",
+            "games_count": len(live_scores),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to refresh live scores: {str(e)}"
+        )
+
+@app.get("/api/prediction-locks")
+async def get_prediction_locks():
+    """Get current prediction lock status for all games"""
+    try:
+        locks = await live_score_service.check_prediction_locks()
+        return {
+            "success": True,
+            "prediction_locks": locks,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to check prediction locks: {str(e)}"
+        )
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
@@ -1110,6 +1290,7 @@ async def health_check():
         "status": "healthy",
         "service": "NHL Daily Predictions",
         "openai_configured": client is not None,
+        "live_scores_active": live_score_updater is not None,
         "timestamp": datetime.now().isoformat()
     }
 
@@ -1124,7 +1305,11 @@ if __name__ == "__main__":
     else:
         print("✅ OpenAI API configured")
     
-    print("🌐 Starting server on http://127.0.0.1:8001")
+    # Get port from environment variable (for Docker/cloud deployments)
+    port = int(os.getenv("PORT", 8001))
+    host = os.getenv("HOST", "0.0.0.0")  # 0.0.0.0 for Docker containers
+    
+    print(f"🌐 Starting server on {host}:{port}")
     print("=" * 50)
     
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host=host, port=port)

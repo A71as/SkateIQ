@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: skateiq-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-skateiq}
+      POSTGRES_USER: ${POSTGRES_USER:-skateiq_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-skateiq_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SkateIQ Application
+  app:
+    build: .
+    container_name: skateiq-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database connection
+      DATABASE_URL: postgresql://${POSTGRES_USER:-skateiq_user}:${POSTGRES_PASSWORD:-changeme123}@postgres:5432/${POSTGRES_DB:-skateiq}
+      
+      # OpenAI API
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      
+      # JWT Secret
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+      
+      # Application settings
+      PORT: 8001
+      ENVIRONMENT: production
+    ports:
+      - "8001:8001"
+    volumes:
+      # Mount logs directory for persistence
+      - app_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+    driver: local
+  app_logs:
+    driver: local

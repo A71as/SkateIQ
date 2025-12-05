@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Scores Test - SkateIQ</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+        
+        .dot.connected {
+            background: #44ff44;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .games-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        
+        .game-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .game-status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-pre { background: #ffa500; color: #000; }
+        .status-live { background: #ff4444; animation: pulse 1s infinite; }
+        .status-final { background: #44ff44; color: #000; }
+        .status-fut { background: #888; }
+        
+        .matchup {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        
+        .score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        
+        .prediction-lock {
+            background: rgba(255,0,0,0.2);
+            border: 1px solid #ff4444;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .prediction-available {
+            background: rgba(0,255,0,0.2);
+            border: 1px solid #44ff44;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 0 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        
+        .log {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 30px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .timestamp {
+            color: #888;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏒 SkateIQ Live Scores</h1>
+        <p>Real-time NHL game updates with prediction locking</p>
+    </div>
+    
+    <div class="status">
+        <div class="status-indicator">
+            <div class="dot" id="connectionDot"></div>
+            <span id="connectionStatus">Connecting...</span>
+        </div>
+        <div>
+            Last Update: <span id="lastUpdate">Never</span>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="btn" onclick="refreshScores()">🔄 Refresh Now</button>
+        <button class="btn" onclick="checkLocks()">🔒 Check Prediction Locks</button>
+        <button class="btn" onclick="clearLog()">🗑️ Clear Log</button>
+    </div>
+    
+    <div class="games-container" id="gamesContainer">
+        <div class="game-card">
+            <div style="text-align: center; color: #888; padding: 40px;">
+                Loading games...
+            </div>
+        </div>
+    </div>
+    
+    <div class="log" id="logContainer">
+        <div class="timestamp">[Loading]</div> Starting WebSocket connection...
+    </div>
+
+    <script>
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        
+        function connectWebSocket() {
+            try {
+                ws = new WebSocket('ws://127.0.0.1:8001/ws/live-scores');
+                
+                ws.onopen = function(event) {
+                    log('✅ WebSocket connected');
+                    document.getElementById('connectionDot').classList.add('connected');
+                    document.getElementById('connectionStatus').textContent = 'Connected';
+                    reconnectAttempts = 0;
+                    
+                    // Send a ping to keep connection alive
+                    setInterval(() => {
+                        if (ws.readyState === WebSocket.OPEN) {
+                            ws.send('ping');
+                        }
+                    }, 30000);
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log('📨 Received: ' + data.type);
+                        
+                        if (data.type === 'live_scores_update') {
+                            updateGames(data.data, data.lock_info || []);
+                            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                        }
+                    } catch (e) {
+                        log('❌ Error parsing message: ' + e.message);
+                    }
+                };
+                
+                ws.onclose = function(event) {
+                    log('❌ WebSocket disconnected');
+                    document.getElementById('connectionDot').classList.remove('connected');
+                    document.getElementById('connectionStatus').textContent = 'Disconnected';
+                    
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        setTimeout(() => {
+                            reconnectAttempts++;
+                            log(`🔄 Reconnection attempt ${reconnectAttempts}/${maxReconnectAttempts}`);
+                            connectWebSocket();
+                        }, 3000);
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    log('❌ WebSocket error: ' + error.message);
+                };
+                
+            } catch (e) {
+                log('❌ Failed to create WebSocket: ' + e.message);
+            }
+        }
+        
+        function updateGames(games, lockInfo = []) {
+            const container = document.getElementById('gamesContainer');
+            
+            if (!games || games.length === 0) {
+                container.innerHTML = `
+                    <div class="game-card">
+                        <div style="text-align: center; color: #888; padding: 40px;">
+                            No games found for today
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = games.map(game => {
+                const lockStatus = lockInfo.find(lock => 
+                    lock.home_team === game.home_team && lock.away_team === game.away_team
+                );
+                
+                const isLocked = lockStatus?.is_locked || false;
+                const statusClass = `status-${game.game_state?.toLowerCase() || 'fut'}`;
+                
+                return `
+                    <div class="game-card">
+                        <div class="game-header">
+                            <span class="game-status ${statusClass}">
+                                ${game.game_state || 'SCHEDULED'}
+                            </span>
+                            <small>${game.date || ''}</small>
+                        </div>
+                        
+                        <div class="matchup">
+                            <span>${game.away_team}</span>
+                            <span class="score">${game.away_score || 0} - ${game.home_score || 0}</span>
+                            <span>${game.home_team}</span>
+                        </div>
+                        
+                        ${game.period_display ? `
+                            <div style="text-align: center; margin: 10px 0; font-weight: bold;">
+                                ${game.period_display}
+                            </div>
+                        ` : ''}
+                        
+                        <div class="${isLocked ? 'prediction-lock' : 'prediction-available'}">
+                            ${isLocked ? '🔒 Predictions Locked' : '✅ Predictions Available'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function refreshScores() {
+            try {
+                log('🔄 Manually refreshing scores...');
+                const response = await fetch('/api/live-scores/refresh', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    log(`✅ Refresh successful: ${data.games_count} games`);
+                } else {
+                    log('❌ Refresh failed');
+                }
+            } catch (e) {
+                log('❌ Error refreshing: ' + e.message);
+            }
+        }
+        
+        async function checkLocks() {
+            try {
+                log('🔒 Checking prediction locks...');
+                const response = await fetch('/api/prediction-locks');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const locked = data.prediction_locks.filter(g => g.is_locked).length;
+                    log(`✅ ${locked} games have locked predictions`);
+                } else {
+                    log('❌ Failed to check locks');
+                }
+            } catch (e) {
+                log('❌ Error checking locks: ' + e.message);
+            }
+        }
+        
+        function log(message) {
+            const logContainer = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `<div><span class="timestamp">[${timestamp}]</span> ${message}</div>`;
+            logContainer.innerHTML += logEntry;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('logContainer').innerHTML = '';
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            connectWebSocket();
+            
+            // Load initial data
+            fetch('/api/live-scores')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateGames(data.live_scores);
+                        log(`✅ Loaded ${data.live_scores.length} games`);
+                    }
+                })
+                .catch(e => log('❌ Error loading initial data: ' + e.message));
+        });
+    </script>
+</body>
+</html>

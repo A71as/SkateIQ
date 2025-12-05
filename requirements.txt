@@ -6,6 +6,8 @@ pydantic[email]
 
 # HTTP & API
 requests
+aiohttp  # Async HTTP client for live scores
+websockets  # WebSocket support for FastAPI
 
 # Environment & Configuration
 python-dotenv

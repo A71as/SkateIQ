@@ -81,6 +81,12 @@ class Prediction(Base):
     # Analysis text
     analysis_text = Column(Text, nullable=True)
     
+    # Live scores and game status
+    is_locked = Column(Boolean, default=False, nullable=False)  # Prediction locked when game starts
+    game_status = Column(String(20), nullable=True)  # FUT, PRE, LIVE, CRIT, OFF, FINAL
+    live_home_score = Column(Integer, nullable=True)
+    live_away_score = Column(Integer, nullable=True)
+    
     # Actual result (filled after game)
     actual_winner = Column(String(10), nullable=True)  # "home" or "away"
     actual_home_score = Column(Integer, nullable=True)

@@ -1,0 +1,85 @@
+# Docker ignore file - exclude unnecessary files from the Docker image
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Local database (use PostgreSQL in production)
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables (will be set in Digital Ocean)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+README_MATCHUP_ANALYZER.md
+*.md
+
+# Test files
+test_*.html
+test_*.py
+*_test.py
+
+# Deployment files (not needed in container)
+docker-compose.yml
+.dockerignore
+
+# Node modules (if any)
+node_modules/
+src/
