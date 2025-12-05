@@ -23,6 +23,10 @@ from live_scores import LiveScoreService, LiveScoreUpdater
 # MoneyPuck data service
 from moneypuck_service import MoneyPuckService
 
+# Game result scraper
+from game_result_scraper import run_scheduler
+import threading
+
 # Database and auth imports
 from database import get_db, Prediction, AccuracyStats, User, update_accuracy_stats, SessionLocal
 from auth import (
@@ -134,11 +138,19 @@ app.add_middleware(
 # Application startup and shutdown events
 @app.on_event("startup")
 async def startup_event():
-    """Initialize live score updater on startup"""
+    """Initialize live score updater and daily scraper on startup"""
     global live_score_updater
+    
+    # Start live score monitoring
     print("🚀 Starting live score updater...")
     live_score_updater = LiveScoreUpdater(live_score_service, manager)
     asyncio.create_task(live_score_updater.start_monitoring())
+    
+    # Start daily result scraper in background thread
+    print("📅 Starting daily result scraper scheduler...")
+    scraper_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scraper_thread.start()
+    print("✅ Daily scraper will run automatically at 2:00 AM every day")
 
 @app.on_event("shutdown")
 async def shutdown_event():
