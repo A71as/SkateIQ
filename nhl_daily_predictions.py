@@ -20,6 +20,9 @@ import logging
 # Live scores import
 from live_scores import LiveScoreService, LiveScoreUpdater
 
+# MoneyPuck data service
+from moneypuck_service import MoneyPuckService
+
 # Database and auth imports
 from database import get_db, Prediction, AccuracyStats, User, update_accuracy_stats, SessionLocal
 from auth import (
@@ -36,9 +39,8 @@ load_dotenv()
 
 # Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-NHL_API_BASE = "https://api-web.nhle.com/v1"
-SPORTSDB_API_KEY = "123"  # Updated API key
-SPORTSDB_API_BASE = "https://www.thesportsdb.com/api/v1/json"
+NHL_API_BASE = "https://api-web.nhle.com/v1"  # For schedules and live scores
+MONEYPUCK_BASE = "https://moneypuck.com"  # For team stats and analytics
 
 # Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
@@ -115,9 +117,9 @@ manager = ConnectionManager()
 
 # Create FastAPI app
 app = FastAPI(
-    title="NHL Daily Predictions",
-    description="AI-powered NHL game predictions with win probabilities",
-    version="2.0.0"
+    title="NHL Daily Predictions powered by MoneyPuck",
+    description="AI-powered NHL game predictions with advanced analytics from MoneyPuck.com",
+    version="3.0.0"
 )
 
 # CORS middleware
@@ -164,11 +166,11 @@ class TokenData(BaseModel):
     username: Optional[str] = None
 
 class NHLDataFetcher:
-    """Fetch NHL data from free NHL Stats API and TheSportsDB"""
+    """Fetch NHL data from NHL API (schedules) and MoneyPuck (stats/analytics)"""
     
     def __init__(self):
         self.base_url = NHL_API_BASE
-        self.sportsdb_url = f"{SPORTSDB_API_BASE}/{SPORTSDB_API_KEY}"
+        self.moneypuck = MoneyPuckService()
         self.session = requests.Session()
         self.team_abbrevs = {
             "Anaheim Ducks": "ANA", "Boston Bruins": "BOS", "Buffalo Sabres": "BUF",
@@ -276,81 +278,31 @@ class NHLDataFetcher:
         return team_name[:3].upper()
     
     def get_team_stats(self, team_name: str) -> Dict[str, Any]:
-        """Get current season team statistics"""
+        """Get current season team statistics from MoneyPuck (enhanced analytics)"""
         try:
-            abbrev = self.get_team_abbrev(team_name)
+            # Use MoneyPuck for comprehensive team stats with advanced analytics
+            stats = self.moneypuck.get_team_stats(team_name)
             
-            # Get standings which includes team stats
-            url = f"{self.base_url}/standings/now"
-            response = self.session.get(url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
+            if stats:
+                return stats
             
-            # Find team in standings
-            for standing in data.get("standings", []):
-                if standing.get("teamAbbrev", {}).get("default") == abbrev:
-                    return {
-                        "team_name": standing.get("teamName", {}).get("default", team_name),
-                        "abbrev": abbrev,
-                        "wins": standing.get("wins", 0),
-                        "losses": standing.get("losses", 0),
-                        "ot_losses": standing.get("otLosses", 0),
-                        "points": standing.get("points", 0),
-                        "games_played": standing.get("gamesPlayed", 0),
-                        "goals_for": standing.get("goalFor", 0),
-                        "goals_against": standing.get("goalAgainst", 0),
-                        "goal_diff": standing.get("goalDifferential", 0),
-                        "point_pct": standing.get("pointPctg", 0),
-                        "streak": standing.get("streakCode", "N/A"),
-                        "home_record": f"{standing.get('homeWins', 0)}-{standing.get('homeLosses', 0)}-{standing.get('homeOtLosses', 0)}",
-                        "road_record": f"{standing.get('roadWins', 0)}-{standing.get('roadLosses', 0)}-{standing.get('roadOtLosses', 0)}",
-                        "last_10": f"{standing.get('l10Wins', 0)}-{standing.get('l10Losses', 0)}-{standing.get('l10OtLosses', 0)}"
-                    }
-            
+            # Fallback to default stats
             return {"team_name": team_name, "error": "Team not found"}
             
         except Exception as e:
-            print(f"Error fetching team stats: {e}")
+            print(f"Error fetching team stats from MoneyPuck: {e}")
             return {"team_name": team_name, "error": str(e)}
     
     def get_team_roster_summary(self, team_abbrev: str) -> Dict[str, Any]:
-        """Get key players from team roster - top scorers and goalies"""
+        """Get key players from team roster - using MoneyPuck data"""
         try:
-            url = f"{self.base_url}/roster/{team_abbrev}/current"
-            response = self.session.get(url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            forwards = data.get("forwards", [])
-            defensemen = data.get("defensemen", [])
-            goalies = data.get("goalies", [])
-            
-            # Get top forwards by position (simplified - would need stats API for actual points)
-            top_forwards = []
-            for player in forwards[:3]:  # Top 3 forwards from roster
-                name = f"{player.get('firstName', {}).get('default', '')} {player.get('lastName', {}).get('default', '')}"
-                top_forwards.append(name.strip())
-            
-            # Get defensemen
-            top_defense = []
-            for player in defensemen[:2]:  # Top 2 D
-                name = f"{player.get('firstName', {}).get('default', '')} {player.get('lastName', {}).get('default', '')}"
-                top_defense.append(name.strip())
-            
-            # Get goalies
-            goalie_names = []
-            for player in goalies:
-                name = f"{player.get('firstName', {}).get('default', '')} {player.get('lastName', {}).get('default', '')}"
-                goalie_names.append(name.strip())
-            
-            return {
-                "top_forwards": top_forwards,
-                "top_defense": top_defense,
-                "goalies": goalie_names
-            }
+            # For now, use MoneyPuck's simplified roster
+            # In future, we could integrate MoneyPuck's player data
+            team_name = self.moneypuck.abbrev_to_name.get(team_abbrev, team_abbrev)
+            return self.moneypuck.get_team_roster(team_name)
             
         except Exception as e:
-            print(f"Error fetching roster for {team_abbrev}: {e}")
+            print(f"Error fetching roster: {e}")
             return {
                 "top_forwards": [],
                 "top_defense": [],
@@ -661,7 +613,7 @@ CRITICAL FORMATTING RULES:
         home_goalies_str = ", ".join(home_roster.get("goalies", [])[:2]) if home_roster.get("goalies") else "TBD"
         away_goalies_str = ", ".join(away_roster.get("goalies", [])[:2]) if away_roster.get("goalies") else "TBD"
         
-        return f"""You are an expert NHL analyst. Analyze the matchup below and provide:
+        return f"""You are an expert NHL analyst using MoneyPuck's advanced analytics. Analyze the matchup below and provide:
 
 1) WIN PROBABILITY section with exact lines:
 Home Team: XX%
@@ -669,10 +621,11 @@ Away Team: YY%
 
 2) ANALYSIS section in NHL reporter style: start with a 1–2 sentence lede like a game preview. Then provide 3–5 concise, data-driven bullets. Do NOT restate percentages or confidence here. Focus on:
 - Current form and last-10 trends
-- Goal differential and goals for/against context
+- Goal differential, actual goals vs expected goals (xGoals) from MoneyPuck
 - Home vs road splits relevant to this matchup
-- Schedule/rest factors implied by records (no made-up injuries)
-- Brief style/tempo implications derived from provided stats only
+- Advanced metrics: Corsi%, Fenwick%, shooting%, save%
+- Power play and penalty kill efficiency
+- Style/tempo implications derived from stats
 
 Also within ANALYSIS include these subsections with bold headings:
 
@@ -701,6 +654,10 @@ HOME: {home_stats['team_name']}
 Record: {home_stats['wins']}-{home_stats['losses']}-{home_stats['ot_losses']} ({home_stats['points']} pts)
 Home Record: {home_stats['home_record']}
 Goals: {home_stats['goals_for']} for, {home_stats['goals_against']} against
+Expected Goals (MoneyPuck): {home_stats.get('xGoalsFor', 'N/A')} xGF, {home_stats.get('xGoalsAgainst', 'N/A')} xGA
+Corsi For %: {home_stats.get('corsiFor', 'N/A')}%
+Shooting %: {home_stats.get('shooting_pct', 'N/A')}% | Save %: {home_stats.get('save_pct', 'N/A')}%
+Power Play: {home_stats.get('pp_pct', 'N/A')}% | Penalty Kill: {home_stats.get('pk_pct', 'N/A')}%
 Last 10: {home_stats['last_10']}
 Streak: {home_stats['streak']}
 
@@ -708,8 +665,14 @@ AWAY: {away_stats['team_name']}
 Record: {away_stats['wins']}-{away_stats['losses']}-{away_stats['ot_losses']} ({away_stats['points']} pts)
 Road Record: {away_stats['road_record']}
 Goals: {away_stats['goals_for']} for, {away_stats['goals_against']} against
+Expected Goals (MoneyPuck): {away_stats.get('xGoalsFor', 'N/A')} xGF, {away_stats.get('xGoalsAgainst', 'N/A')} xGA
+Corsi For %: {away_stats.get('corsiFor', 'N/A')}%
+Shooting %: {away_stats.get('shooting_pct', 'N/A')}% | Save %: {away_stats.get('save_pct', 'N/A')}%
+Power Play: {away_stats.get('pp_pct', 'N/A')}% | Penalty Kill: {away_stats.get('pk_pct', 'N/A')}%
 Last 10: {away_stats['last_10']}
-Streak: {away_stats['streak']}"""
+Streak: {away_stats['streak']}
+
+Data source: MoneyPuck.com - Advanced NHL Analytics"""
 
 # Initialize analyzer
 analyzer = MatchupAnalyzer(client) if client else None

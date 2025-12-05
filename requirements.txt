@@ -8,6 +8,7 @@ pydantic[email]
 requests
 aiohttp  # Async HTTP client for live scores
 websockets  # WebSocket support for FastAPI
+pandas  # Data analysis for MoneyPuck CSV data
 
 # Environment & Configuration
 python-dotenv
