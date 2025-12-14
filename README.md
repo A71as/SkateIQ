@@ -1,8 +1,6 @@
-# 🏒 SkateIQ - NHL AI-Powered Predictions# 🏒 SkateIQ - NHL Daily Matchup Predictions
+# 🏒 SkateIQ - NHL AI-Powered Predictions
 
-
-
-**AI-powered NHL game predictions** using GPT-4o and real-time NHL data. Get win probabilities, confidence ratings, and reporter-style analysis with future date predictions and live accuracy tracking.AI-powered NHL game predictions using GPT-4o and real-time NHL data. Get win probabilities, confidence ratings, and reporter-style analysis featuring actual player projections and matchup insights.
+**AI-powered NHL game predictions** using GPT-4o and real-time NHL data. Get win probabilities, confidence ratings, and reporter-style analysis with enhanced accuracy tracking and prediction locking.
 
 
 
