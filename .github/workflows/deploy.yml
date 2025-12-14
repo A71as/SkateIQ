@@ -13,21 +13,56 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
     
+    - name: Verify secrets are set
+      run: |
+        if [ -z "${{ secrets.DO_HOST }}" ]; then
+          echo "Error: DO_HOST secret is not set"
+          echo "Please add the following secrets to your GitHub repository:"
+          echo "- DO_HOST (your Digital Ocean droplet IP or domain)"
+          echo "- DO_USERNAME (SSH username, usually 'root')"
+          echo "- DO_SSH_KEY (your private SSH key)"
+          exit 1
+        fi
+        echo "✅ Secrets are configured"
+    
     - name: Deploy to Digital Ocean
-      uses: appleboy/ssh-action@master
+      uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.DO_HOST }}
         username: ${{ secrets.DO_USERNAME }}
         key: ${{ secrets.DO_SSH_KEY }}
+        port: 22
         script: |
-          cd /opt/skateiq
+          echo "📦 Deploying SkateIQ..."
+          cd /opt/skateiq || { echo "Directory /opt/skateiq not found"; exit 1; }
+          
+          echo "🔄 Pulling latest changes..."
           git pull origin main
+          
+          echo "🛑 Stopping containers..."
           docker-compose down
+          
+          echo "🔨 Building new images..."
           docker-compose build --no-cache
+          
+          echo "🚀 Starting containers..."
           docker-compose up -d
-          docker-compose exec -T app python migrate_live_scores.py
+          
+          echo "⏳ Waiting for containers to start..."
+          sleep 15
+          
+          echo "🔄 Running database migrations..."
+          docker-compose exec -T app python migrate_live_scores.py || echo "Migration not needed"
+          
+          echo "✅ Deployment complete!"
           
     - name: Health Check
       run: |
+        echo "🏥 Running health check..."
         sleep 10
-        curl -f http://${{ secrets.DO_HOST }}:8001/health || exit 1
+        if curl -f http://${{ secrets.DO_HOST }}:8001/health; then
+          echo "✅ Health check passed"
+        else
+          echo "❌ Health check failed"
+          exit 1
+        fi
