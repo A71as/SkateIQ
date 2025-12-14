@@ -962,7 +962,7 @@ async def analyze_matchup(request: dict):
 
 @app.get("/api/accuracy")
 async def get_accuracy_stats(db: Session = Depends(get_db)):
-    """Get prediction accuracy statistics from database"""
+    """Get comprehensive prediction accuracy statistics from database"""
     try:
         # Get or create overall stats record
         from database import get_or_create_overall_stats
@@ -982,15 +982,77 @@ async def get_accuracy_stats(db: Session = Depends(get_db)):
             if stats.last_30_days_total > 0 else 0, 1
         )
         
+        # Confidence-based accuracy
+        high_conf_accuracy = round(
+            (stats.high_confidence_correct / stats.high_confidence_total * 100)
+            if stats.high_confidence_total > 0 else 0, 1
+        )
+        med_conf_accuracy = round(
+            (stats.medium_confidence_correct / stats.medium_confidence_total * 100)
+            if stats.medium_confidence_total > 0 else 0, 1
+        )
+        low_conf_accuracy = round(
+            (stats.low_confidence_correct / stats.low_confidence_total * 100)
+            if stats.low_confidence_total > 0 else 0, 1
+        )
+        
+        # Parse team stats
+        import json
+        best_teams = json.loads(stats.best_teams) if stats.best_teams else []
+        worst_teams = json.loads(stats.worst_teams) if stats.worst_teams else []
+        
+        # Get locked predictions count
+        locked_count = db.query(Prediction).filter(Prediction.is_locked == True).count()
+        pending_count = db.query(Prediction).filter(
+            Prediction.is_correct.is_(None),
+            Prediction.is_locked == False
+        ).count()
+        
         return {
             "success": True,
-            "total_predictions": stats.total_predictions,
-            "correct_predictions": stats.correct_predictions,
-            "accuracy_percentage": round(stats.accuracy_percentage, 1),
-            "last_7_days_accuracy": last_7_days_accuracy,
-            "last_30_days_accuracy": last_30_days_accuracy,
-            "last_7_days_total": stats.last_7_days_total,
-            "last_30_days_total": stats.last_30_days_total,
+            "overall": {
+                "total_predictions": stats.total_predictions,
+                "correct_predictions": stats.correct_predictions,
+                "accuracy_percentage": round(stats.accuracy_percentage, 1),
+                "locked_predictions": locked_count,
+                "pending_results": pending_count
+            },
+            "time_based": {
+                "last_7_days": {
+                    "accuracy": last_7_days_accuracy,
+                    "total": stats.last_7_days_total,
+                    "correct": stats.last_7_days_correct
+                },
+                "last_30_days": {
+                    "accuracy": last_30_days_accuracy,
+                    "total": stats.last_30_days_total,
+                    "correct": stats.last_30_days_correct
+                }
+            },
+            "confidence_based": {
+                "high": {
+                    "accuracy": high_conf_accuracy,
+                    "total": stats.high_confidence_total,
+                    "correct": stats.high_confidence_correct,
+                    "label": "8-10 Confidence"
+                },
+                "medium": {
+                    "accuracy": med_conf_accuracy,
+                    "total": stats.medium_confidence_total,
+                    "correct": stats.medium_confidence_correct,
+                    "label": "5-7 Confidence"
+                },
+                "low": {
+                    "accuracy": low_conf_accuracy,
+                    "total": stats.low_confidence_total,
+                    "correct": stats.low_confidence_correct,
+                    "label": "1-4 Confidence"
+                }
+            },
+            "team_performance": {
+                "best_teams": best_teams,
+                "worst_teams": worst_teams
+            },
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
@@ -1056,6 +1118,68 @@ async def update_game_result(request: dict, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to update result: {str(e)}"
+        )
+
+@app.post("/api/predictions/lock")
+async def lock_prediction(request: dict, db: Session = Depends(get_db)):
+    """Manually lock a prediction to prevent modifications"""
+    try:
+        home_team = request.get("home_team")
+        away_team = request.get("away_team")
+        game_date = request.get("game_date")
+        
+        if not all([home_team, away_team, game_date]):
+            raise HTTPException(status_code=400, detail="Missing required fields: home_team, away_team, game_date")
+        
+        # Parse game date
+        if 'T' in game_date:
+            game_date_obj = datetime.fromisoformat(game_date.replace('Z', '+00:00'))
+        else:
+            game_date_obj = datetime.strptime(game_date, '%Y-%m-%d')
+        
+        # Find prediction
+        prediction = db.query(Prediction).filter(
+            Prediction.home_team == home_team,
+            Prediction.away_team == away_team,
+            Prediction.game_date == game_date_obj
+        ).first()
+        
+        if not prediction:
+            raise HTTPException(status_code=404, detail="Prediction not found")
+        
+        if prediction.is_locked:
+            return {
+                "success": True,
+                "message": "Prediction was already locked",
+                "prediction": {
+                    "home_team": prediction.home_team,
+                    "away_team": prediction.away_team,
+                    "game_date": prediction.game_date.isoformat(),
+                    "is_locked": prediction.is_locked
+                }
+            }
+        
+        # Lock the prediction
+        prediction.is_locked = True
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Prediction locked successfully",
+            "prediction": {
+                "home_team": prediction.home_team,
+                "away_team": prediction.away_team,
+                "game_date": prediction.game_date.isoformat(),
+                "is_locked": prediction.is_locked
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to lock prediction: {str(e)}"
         )
 
 # ============================================================================

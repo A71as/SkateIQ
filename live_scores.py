@@ -124,14 +124,32 @@ class LiveScoreService:
                         Prediction.game_date == game_date
                     ).all()
                     
-                    is_locked = game["is_started"]  # Lock if game has started
+                    # Enhanced locking logic: lock if game started OR starting within 30 minutes
+                    is_locked = game["is_started"]
+                    lock_reason = "Game started" if is_locked else ""
+                    
+                    # Check if game starts soon (lock 30 minutes before)
+                    if not is_locked and game["game_state"] == "PRE":
+                        try:
+                            from datetime import datetime
+                            # Parse game start time and check if within 30 minutes
+                            game_time_str = game.get("start_time")
+                            if game_time_str:
+                                game_time = datetime.fromisoformat(game_time_str.replace('Z', '+00:00'))
+                                now = datetime.now(game_time.tzinfo)
+                                minutes_until_start = (game_time - now).total_seconds() / 60
+                                if minutes_until_start <= 30 and minutes_until_start > 0:
+                                    is_locked = True
+                                    lock_reason = f"Game starts in {int(minutes_until_start)} minutes"
+                        except Exception as e:
+                            logger.warning(f"Could not parse game start time: {e}")
                     
                     # Update prediction lock status in database
                     for pred in predictions:
                         if is_locked and not pred.is_locked:
                             pred.is_locked = True
                             pred.game_status = game["game_state"]
-                            logger.info(f"Locked prediction: {pred.away_team} @ {pred.home_team}")
+                            logger.info(f"🔒 Locked prediction: {pred.away_team} @ {pred.home_team} ({lock_reason})")
                         
                         # Update live scores
                         if game["is_live"] or game["is_finished"]:
@@ -146,6 +164,7 @@ class LiveScoreService:
                         "away_team": game["away_team"],
                         "date": game_date,
                         "is_locked": is_locked,
+                        "lock_reason": lock_reason,
                         "game_status": game["game_state"],
                         "home_score": game["home_score"],
                         "away_score": game["away_score"],

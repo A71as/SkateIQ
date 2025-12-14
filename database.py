@@ -122,6 +122,18 @@ class AccuracyStats(Base):
     last_30_days_total = Column(Integer, default=0)
     last_30_days_correct = Column(Integer, default=0)
     
+    # Confidence-based accuracy
+    high_confidence_total = Column(Integer, default=0)  # Confidence 8-10
+    high_confidence_correct = Column(Integer, default=0)
+    medium_confidence_total = Column(Integer, default=0)  # Confidence 5-7
+    medium_confidence_correct = Column(Integer, default=0)
+    low_confidence_total = Column(Integer, default=0)  # Confidence 1-4
+    low_confidence_correct = Column(Integer, default=0)
+    
+    # Team-specific stats (JSON string)
+    best_teams = Column(Text, nullable=True)  # Teams with highest prediction accuracy
+    worst_teams = Column(Text, nullable=True)  # Teams with lowest prediction accuracy
+    
     # Metadata
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -192,6 +204,61 @@ def update_accuracy_stats(db, user_id=None):
     last_30_total = last_30_query.count()
     last_30_correct = last_30_query.filter(Prediction.is_correct == True).count()
     
+    # Confidence-based accuracy
+    high_conf_total = 0
+    high_conf_correct = 0
+    med_conf_total = 0
+    med_conf_correct = 0
+    low_conf_total = 0
+    low_conf_correct = 0
+    
+    for pred in query.all():
+        try:
+            conf = int(pred.confidence) if pred.confidence else 5
+            if conf >= 8:
+                high_conf_total += 1
+                if pred.is_correct:
+                    high_conf_correct += 1
+            elif conf >= 5:
+                med_conf_total += 1
+                if pred.is_correct:
+                    med_conf_correct += 1
+            else:
+                low_conf_total += 1
+                if pred.is_correct:
+                    low_conf_correct += 1
+        except (ValueError, TypeError):
+            med_conf_total += 1
+            if pred.is_correct:
+                med_conf_correct += 1
+    
+    # Team-specific accuracy
+    import json
+    team_stats = {}
+    for pred in query.all():
+        for team in [pred.home_team, pred.away_team]:
+            if team not in team_stats:
+                team_stats[team] = {"total": 0, "correct": 0}
+            team_stats[team]["total"] += 1
+            if pred.is_correct:
+                team_stats[team]["correct"] += 1
+    
+    # Calculate accuracy per team and sort
+    team_accuracy = [
+        {
+            "team": team,
+            "accuracy": round((ts["correct"] / ts["total"] * 100) if ts["total"] > 0 else 0, 1),
+            "total": ts["total"],
+            "correct": ts["correct"]
+        }
+        for team, ts in team_stats.items()
+        if ts["total"] >= 3  # Only teams with 3+ predictions
+    ]
+    team_accuracy.sort(key=lambda x: x["accuracy"], reverse=True)
+    
+    best_teams = json.dumps(team_accuracy[:5]) if team_accuracy else None
+    worst_teams = json.dumps(team_accuracy[-5:]) if team_accuracy else None
+    
     # Update or create stats
     stats = db.query(AccuracyStats).filter(AccuracyStats.user_id == user_id).first()
     if not stats:
@@ -205,6 +272,14 @@ def update_accuracy_stats(db, user_id=None):
     stats.last_7_days_correct = last_7_correct
     stats.last_30_days_total = last_30_total
     stats.last_30_days_correct = last_30_correct
+    stats.high_confidence_total = high_conf_total
+    stats.high_confidence_correct = high_conf_correct
+    stats.medium_confidence_total = med_conf_total
+    stats.medium_confidence_correct = med_conf_correct
+    stats.low_confidence_total = low_conf_total
+    stats.low_confidence_correct = low_conf_correct
+    stats.best_teams = best_teams
+    stats.worst_teams = worst_teams
     stats.updated_at = datetime.utcnow()
     
     db.commit()
