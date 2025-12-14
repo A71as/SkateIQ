@@ -25,6 +25,11 @@ jobs:
         fi
         echo "✅ Secrets are configured"
     
+    - name: Test SSH connectivity
+      run: |
+        echo "🔍 Testing connection to ${{ secrets.DO_HOST }}..."
+        nc -zv -w5 ${{ secrets.DO_HOST }} 22 || echo "⚠️ Port 22 appears blocked or host unreachable"
+    
     - name: Deploy to Digital Ocean
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -32,6 +37,8 @@ jobs:
         username: ${{ secrets.DO_USERNAME }}
         key: ${{ secrets.DO_SSH_KEY }}
         port: 22
+        timeout: 60s
+        command_timeout: 30m
         script: |
           echo "📦 Deploying SkateIQ..."
           cd /opt/skateiq || { echo "Directory /opt/skateiq not found"; exit 1; }
