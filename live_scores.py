@@ -131,7 +131,6 @@ class LiveScoreService:
                     # Check if game starts soon (lock 30 minutes before)
                     if not is_locked and game["game_state"] == "PRE":
                         try:
-                            from datetime import datetime
                             # Parse game start time and check if within 30 minutes
                             game_time_str = game.get("start_time")
                             if game_time_str:
