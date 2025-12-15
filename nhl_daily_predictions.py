@@ -372,20 +372,43 @@ class NHLDataFetcher:
             return {"team_name": team_name, "error": str(e)}
     
     def get_team_roster_summary(self, team_abbrev: str) -> Dict[str, Any]:
-        """Get key players from team roster - using MoneyPuck data"""
+        """Get key players from team roster - using NHL API"""
         try:
-            # For now, use MoneyPuck's simplified roster
-            # In future, we could integrate MoneyPuck's player data
-            team_name = self.moneypuck.abbrev_to_name.get(team_abbrev, team_abbrev)
-            return self.moneypuck.get_team_roster(team_name)
+            # Use NHL API for roster data
+            url = f"{NHL_API_BASE}/roster/{team_abbrev}/current"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            forwards = []
+            defense = []
+            goalies = []
+            
+            # Parse roster by position
+            for position_type, players in data.items():
+                if isinstance(players, list):
+                    for player in players:
+                        player_name = player.get('firstName', {}).get('default', '') + ' ' + player.get('lastName', {}).get('default', '')
+                        position = player.get('positionCode', '')
+                        
+                        if position == 'G':
+                            goalies.append(player_name)
+                        elif position == 'D':
+                            defense.append(player_name)
+                        else:  # F, L, R, C
+                            forwards.append(player_name)
+            
+            return {
+                "top_forwards": forwards[:3] if forwards else [],
+                "top_defense": defense[:2] if defense else [],
+                "goalies": goalies[:2] if goalies else []
+            }
             
         except Exception as e:
-            print(f"Error fetching roster: {e}")
-            return {
-                "top_forwards": [],
-                "top_defense": [],
-                "goalies": []
-            }
+            print(f"Error fetching NHL roster for {team_abbrev}: {e}")
+            # Fallback to MoneyPuck placeholder
+            team_name = self.moneypuck.abbrev_to_name.get(team_abbrev, team_abbrev)
+            return self.moneypuck.get_team_roster(team_name)
 
 class MatchupAnalyzer:
     """AI-powered NHL matchup analysis"""
@@ -529,8 +552,8 @@ class MatchupAnalyzer:
         home_roster = self.fetcher.get_team_roster_summary(home_stats.get("abbrev", ""))
         away_roster = self.fetcher.get_team_roster_summary(away_stats.get("abbrev", ""))
         
-        print(f"🎯 Home roster: {home_roster}")
-        print(f"🎯 Away roster: {away_roster}")
+        print(f"🎯 Home roster ({home_team}): Forwards: {', '.join(home_roster.get('top_forwards', [])[:3])}, Defense: {', '.join(home_roster.get('top_defense', [])[:2])}, Goalies: {', '.join(home_roster.get('goalies', []))}") 
+        print(f"🎯 Away roster ({away_team}): Forwards: {', '.join(away_roster.get('top_forwards', [])[:3])}, Defense: {', '.join(away_roster.get('top_defense', [])[:2])}, Goalies: {', '.join(away_roster.get('goalies', []))}")
         
         # Build prompt for GPT
         prompt = self._build_analysis_prompt(home_stats, away_stats, home_roster, away_roster, game_date)
@@ -560,13 +583,13 @@ Away Team: YY%
 **Style/Tempo Implications:** [1-2 sentences predicting game pace and style based on stats]
 
 **Projected Impact Players:**
-- Home: [Player name] is [brief reason for impact potential]
-- Away: [Player name] is [brief reason for impact potential]
+Home: Name 2-3 actual players from the roster (forwards/defense) who could impact the game, with brief reasoning for each.
+Away: Name 2-3 actual players from the roster (forwards/defense) who could impact the game, with brief reasoning for each.
 
 **Projected Starting Goalies:**
-- Home: [Goalie name] (projected)
-- Away: [Goalie name] (projected)
-Monitor pregame reports for confirmed starters.
+Home: [Select from actual goalie names provided] (projected starter)
+Away: [Select from actual goalie names provided] (projected starter)
+Note: Monitor pregame reports for confirmed starters.
 
 **Injuries/Notes:**
 [Only mention widely confirmed injuries; otherwise state: "No notable injuries confirmed as of today."]
@@ -943,6 +966,13 @@ async def analyze_matchup(request: dict):
                     
                     db.commit()
                     print(f"📊 Stored prediction in database")
+                    
+                    # Add lock status and live scores to result
+                    if existing:
+                        result["is_locked"] = existing.is_locked
+                        result["game_status"] = existing.game_status
+                        result["live_home_score"] = existing.live_home_score
+                        result["live_away_score"] = existing.live_away_score
                 except Exception as db_error:
                     db.rollback()
                     print(f"⚠️ Database error: {db_error}")

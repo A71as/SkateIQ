@@ -386,65 +386,152 @@ def get_html_template():
             margin-bottom: 16px;
         }
 
-        .analysis-toggle {
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
             background: var(--bg-card);
+            backdrop-filter: blur(20px) saturate(180%);
+            border-radius: var(--radius);
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease;
             border: 1px solid var(--border);
-            border-radius: 12px;
-            margin-top: 16px;
-            overflow: hidden;
-            transition: var(--transition);
         }
 
-        .analysis-toggle:hover {
-            border-color: rgba(0, 113, 227, 0.3);
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
 
-        .analysis-header {
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px;
-            cursor: pointer;
-            user-select: none;
-            background: rgba(0, 0, 0, 0.02);
-            transition: var(--transition);
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px) saturate(180%);
+            z-index: 10;
         }
 
-        .analysis-header:hover {
-            background: rgba(0, 113, 227, 0.05);
-        }
-
-        .analysis-header-text {
-            font-size: 15px;
-            font-weight: 600;
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
             color: var(--text-primary);
             display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--text-secondary);
+            font-size: 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            background: rgba(0, 0, 0, 0.1);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .analysis-button {
+            width: 100%;
+            margin-top: 16px;
+        }
+
+        .live-score {
+            background: linear-gradient(135deg, rgba(52, 199, 89, 0.1), rgba(52, 199, 89, 0.05));
+            border: 1px solid rgba(52, 199, 89, 0.2);
+            padding: 16px;
+            border-radius: 12px;
+            margin: 16px 0;
+            text-align: center;
+        }
+
+        .live-score-header {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .live-score-matchup {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .live-score-team {
+            display: flex;
+            flex-direction: column;
             align-items: center;
             gap: 8px;
         }
 
-        .analysis-arrow {
-            font-size: 12px;
-            color: var(--text-secondary);
-            transition: transform 0.3s ease;
+        .live-score-value {
+            font-size: 36px;
+            color: #34c759;
         }
 
-        .analysis-arrow.open {
-            transform: rotate(180deg);
-        }
-
-        .analysis-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-        }
-
-        .analysis-content.open {
-            max-height: 2000px;
+        .prediction-locked {
+            background: rgba(255, 149, 0, 0.1);
+            border: 1px solid rgba(255, 149, 0, 0.2);
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 14px;
+            color: #ff9500;
+            margin-bottom: 16px;
+            font-weight: 500;
         }
 
         .analysis {
-            padding: 16px;
             font-size: 14px;
             line-height: 1.7;
             color: var(--text-primary);
@@ -600,6 +687,22 @@ def get_html_template():
         </div>
 
         <div class="games-grid" id="gamesGrid"></div>
+
+        <!-- Analysis Modal -->
+        <div class="modal" id="analysisModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title">
+                        <span>📊</span>
+                        <span id="modalTeams">Detailed Analysis</span>
+                    </div>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body" id="modalAnalysisContent">
+                    <!-- Analysis content will be inserted here -->
+                </div>
+            </div>
+        </div>
 
         <footer>
             <p>Built with care by <strong>Ahmed Alami</strong></p>
@@ -838,6 +941,25 @@ def get_html_template():
             }
         }
 
+        function openModal(teams, analysis) {
+            document.getElementById('modalTeams').textContent = teams;
+            document.getElementById('modalAnalysisContent').innerHTML = formatAnalysis(analysis);
+            document.getElementById('analysisModal').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            document.getElementById('analysisModal').classList.remove('show');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('analysisModal')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
         function displayPrediction(index, data) {
             const predictionDiv = document.getElementById(`prediction-${index}`);
             const analysis = (data.analysis_text || data.analysis || '');
@@ -873,8 +995,39 @@ def get_html_template():
             const homeWinner = homeProb > awayProb;
             const awayWinner = awayProb > homeProb;
             
+            // Check if game has live scores
+            let liveScoreHTML = '';
+            if (data.live_home_score !== undefined && data.live_away_score !== undefined && data.game_status) {
+                const statusLabel = data.game_status === 'FINAL' ? 'FINAL' : 'LIVE';
+                const statusClass = data.game_status === 'FINAL' ? '' : ' 🔴';
+                liveScoreHTML = `
+                    <div class="live-score">
+                        <div class="live-score-header">${statusLabel}${statusClass}</div>
+                        <div class="live-score-matchup">
+                            <div class="live-score-team">
+                                <div>${getTeamEmoji(data.away_team)}</div>
+                                <div class="live-score-value">${data.live_away_score}</div>
+                            </div>
+                            <div style="font-size: 24px; color: var(--text-secondary);">-</div>
+                            <div class="live-score-team">
+                                <div>${getTeamEmoji(data.home_team)}</div>
+                                <div class="live-score-value">${data.live_home_score}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Check if prediction is locked
+            let lockedHTML = '';
+            if (data.is_locked) {
+                lockedHTML = '<div class="prediction-locked">🔒 Prediction Locked - Game Started</div>';
+            }
+            
             predictionDiv.innerHTML = `
                 <div class="prediction-section">
+                    ${lockedHTML}
+                    ${liveScoreHTML}
                     <div class="probabilities">
                         <div class="probability ${awayWinner ? 'winner' : ''}">
                             <div class="prob-label">${getTeamEmoji(data.away_team)} ${data.away_team}</div>
@@ -888,20 +1041,8 @@ def get_html_template():
                     <div class="confidence-badge">
                         Confidence: ${confidenceText}/10
                     </div>
-                    <div class="analysis-toggle">
-                        <div class="analysis-header" onclick="toggleAnalysis(${index})">
-                            <div class="analysis-header-text">
-                                <span>📊</span>
-                                <span>Detailed Analysis</span>
-                            </div>
-                            <div class="analysis-arrow" id="arrow-${index}">▼</div>
-                        </div>
-                        <div class="analysis-content" id="analysis-content-${index}">
-                            <div class="analysis">
-                                ${formatAnalysis(analysis)}
-                            </div>
-                        </div>
-                    </div>
+                    <button class="btn btn-primary analysis-button" onclick="openModal('${data.away_team} @ ${data.home_team}', ${JSON.stringify(analysis).replace(/'/g, "\\'")})">\n                        📊 View Detailed Analysis
+                    </button>
                 </div>
             `;
         }
@@ -933,14 +1074,6 @@ def get_html_template():
             }
             if (inList) { html += '</ul>'; }
             return html;
-        }
-
-        function toggleAnalysis(index) {
-            const content = document.getElementById(`analysis-content-${index}`);
-            const arrow = document.getElementById(`arrow-${index}`);
-            
-            content.classList.toggle('open');
-            arrow.classList.toggle('open');
         }
 
         window.addEventListener('load', async function() {
