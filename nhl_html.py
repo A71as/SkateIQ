@@ -473,7 +473,8 @@ def get_html_template():
         }
 
         .modal-body {
-            padding: 24px;
+            padding: 32px;
+            background: linear-gradient(180deg, var(--bg-card) 0%, rgba(245, 245, 247, 0.5) 100%);
         }
 
         .analysis-button {
@@ -482,21 +483,22 @@ def get_html_template():
         }
 
         .live-score {
-            background: linear-gradient(135deg, rgba(52, 199, 89, 0.1), rgba(52, 199, 89, 0.05));
-            border: 1px solid rgba(52, 199, 89, 0.2);
-            padding: 16px;
-            border-radius: 12px;
-            margin: 16px 0;
+            background: linear-gradient(135deg, rgba(52, 199, 89, 0.15), rgba(52, 199, 89, 0.08));
+            border: 1px solid rgba(52, 199, 89, 0.3);
+            padding: 20px;
+            border-radius: 14px;
+            margin: 20px 0;
             text-align: center;
+            box-shadow: 0 4px 12px rgba(52, 199, 89, 0.1);
         }
 
         .live-score-header {
-            font-size: 13px;
-            color: var(--text-secondary);
+            font-size: 12px;
+            color: #34c759;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 12px;
-            font-weight: 600;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+            font-weight: 700;
         }
 
         .live-score-matchup {
@@ -515,38 +517,76 @@ def get_html_template():
         }
 
         .live-score-value {
-            font-size: 36px;
+            font-size: 42px;
+            font-weight: 800;
             color: #34c759;
+            text-shadow: 0 2px 4px rgba(52, 199, 89, 0.2);
         }
 
         .prediction-locked {
-            background: rgba(255, 149, 0, 0.1);
-            border: 1px solid rgba(255, 149, 0, 0.2);
-            padding: 12px;
-            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(255, 149, 0, 0.12), rgba(255, 149, 0, 0.06));
+            border: 1px solid rgba(255, 149, 0, 0.3);
+            padding: 14px;
+            border-radius: 12px;
             text-align: center;
             font-size: 14px;
             color: #ff9500;
-            margin-bottom: 16px;
-            font-weight: 500;
+            margin-bottom: 20px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(255, 149, 0, 0.1);
         }
 
         .analysis {
-            font-size: 14px;
-            line-height: 1.7;
+            font-size: 15px;
+            line-height: 1.8;
             color: var(--text-primary);
         }
 
         .analysis h4 {
-            font-size: 15px;
-            font-weight: 600;
-            margin: 16px 0 8px 0;
+            font-size: 16px;
+            font-weight: 700;
+            margin: 24px 0 12px 0;
             color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .analysis h4::before {
+            content: "•";
+            color: var(--accent);
+            font-size: 20px;
         }
 
         .analysis ul {
-            margin-left: 20px;
-            margin-top: 8px;
+            margin-left: 24px;
+            margin-top: 12px;
+            list-style: none;
+        }
+
+        .analysis li {
+            position: relative;
+            padding-left: 20px;
+            margin-bottom: 8px;
+        }
+
+        .analysis li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .analysis p {
+            margin-bottom: 12px;
+        }
+
+        .analysis strong {
+            color: var(--accent);
+            font-weight: 600;
         }
 
         .analysis li {
