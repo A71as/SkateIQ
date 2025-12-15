@@ -372,9 +372,19 @@ class NHLDataFetcher:
             return {"team_name": team_name, "error": str(e)}
     
     def get_team_roster_summary(self, team_abbrev: str) -> Dict[str, Any]:
-        """Get key players from team roster - using NHL API"""
+        """Get key players from team roster - using MoneyPuck as default, NHL API as fallback"""
         try:
-            # Use NHL API for roster data
+            # Use MoneyPuck for roster data (primary source)
+            team_name = self.moneypuck.abbrev_to_name.get(team_abbrev, team_abbrev)
+            roster = self.moneypuck.get_team_roster(team_name)
+            
+            # If MoneyPuck returns valid data, use it
+            if roster and (roster.get('top_forwards') or roster.get('goalies')):
+                print(f"✅ Using MoneyPuck roster for {team_name}")
+                return roster
+            
+            # Fallback to NHL API if MoneyPuck has no data
+            print(f"⚠️ MoneyPuck roster empty, trying NHL API for {team_abbrev}")
             url = f"{NHL_API_BASE}/roster/{team_abbrev}/current"
             response = requests.get(url, timeout=10)
             response.raise_for_status()
@@ -398,6 +408,7 @@ class NHLDataFetcher:
                         else:  # F, L, R, C
                             forwards.append(player_name)
             
+            print(f"✅ Using NHL API roster for {team_abbrev}")
             return {
                 "top_forwards": forwards[:3] if forwards else [],
                 "top_defense": defense[:2] if defense else [],
@@ -405,8 +416,8 @@ class NHLDataFetcher:
             }
             
         except Exception as e:
-            print(f"Error fetching NHL roster for {team_abbrev}: {e}")
-            # Fallback to MoneyPuck placeholder
+            print(f"❌ Error fetching roster for {team_abbrev}: {e}")
+            # Final fallback to MoneyPuck placeholder
             team_name = self.moneypuck.abbrev_to_name.get(team_abbrev, team_abbrev)
             return self.moneypuck.get_team_roster(team_name)
 
