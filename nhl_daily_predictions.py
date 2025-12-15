@@ -594,13 +594,13 @@ Away Team: YY%
 **Style/Tempo Implications:** [1-2 sentences predicting game pace and style based on stats]
 
 **Projected Impact Players:**
-Home: Name 2-3 actual players from the roster (forwards/defense) who could impact the game, with brief reasoning for each.
-Away: Name 2-3 actual players from the roster (forwards/defense) who could impact the game, with brief reasoning for each.
+Home: [Pick specific names from the roster provided and explain why each player matters, e.g., "John Doe has been hot lately" or "Jane Smith excels on the power play"]
+Away: [Pick specific names from the roster provided and explain why each player matters]
 
 **Projected Starting Goalies:**
-Home: [Select from actual goalie names provided] (projected starter)
-Away: [Select from actual goalie names provided] (projected starter)
-Note: Monitor pregame reports for confirmed starters.
+Home: [Choose ONE goalie name from the goalies list provided] (projected starter based on roster)
+Away: [Choose ONE goalie name from the goalies list provided] (projected starter based on roster)
+Note: These are projections based on the roster; confirm with pregame reports.
 
 **Injuries/Notes:**
 [Only mention widely confirmed injuries; otherwise state: "No notable injuries confirmed as of today."]
@@ -741,15 +741,16 @@ Away Team: YY%
 
 Also within ANALYSIS include these subsections with bold headings:
 
-**Projected Impact Players**: Reference these actual players when discussing likely goal/assist contributors:
-- Home: {home_forwards_str}
-- Away: {away_forwards_str}
-Mention 1-2 players per team with a brief reason based on their role and team form.
+**Projected Impact Players**: You MUST reference the ACTUAL player names provided below. DO NOT use generic placeholders like "Forward 1" or "Goalie 1". Use the real names from the roster:
+- Home roster: {home_forwards_str}
+- Away roster: {away_forwards_str}
+Pick 1-2 specific players from each team's roster and explain why they'll impact the game (e.g., scoring threats, defensive roles, hot streaks).
 
-**Projected Starting Goalies**: 
-- Home: {home_goalies_str} (likely starter based on roster)
-- Away: {away_goalies_str} (likely starter based on roster)
-Note that these are projections; confirm with pregame reports.
+**Projected Starting Goalies**: You MUST use the ACTUAL goalie names from the lists below. DO NOT use "Goalie 1" - select a real name:
+- Home goalies available: {home_goalies_str}
+- Away goalies available: {away_goalies_str}
+Select ONE goalie from each list as the projected starter and state "(projected starter based on roster)".
+Note: Confirm with pregame reports for official starters.
 
 **Injuries/Notes**: Only mention if widely known and non-speculative; otherwise say "No notable injuries confirmed as of today." Do NOT make up injuries.
 

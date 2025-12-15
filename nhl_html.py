@@ -1041,10 +1041,19 @@ def get_html_template():
                     <div class="confidence-badge">
                         Confidence: ${confidenceText}/10
                     </div>
-                    <button class="btn btn-primary analysis-button" onclick="openModal('${data.away_team} @ ${data.home_team}', ${JSON.stringify(analysis).replace(/'/g, "\\'")})">\n                        📊 View Detailed Analysis
+                    <button class="btn btn-primary analysis-button" onclick="openModalForGame(${index})">
+                        📊 View Detailed Analysis
                     </button>
+                    <div id="analysis-data-${index}" style="display: none;">${analysis}</div>
                 </div>
             `;
+        }
+        
+        function openModalForGame(index) {
+            const analysisText = document.getElementById(`analysis-data-${index}`).textContent;
+            const gameCard = document.getElementById(`game-${index}`);
+            const teams = gameCard ? gameCard.querySelector('.matchup')?.textContent.replace(/\\s+/g, ' ').trim() : 'Game Analysis';
+            openModal(teams, analysisText);
         }
 
         function formatAnalysis(text) {
